@@ -1,4 +1,4 @@
-name: Release Vi Drop
+name: Build Vi Drop
 
 on:
   push:
@@ -13,19 +13,18 @@ permissions:
   contents: write
 
 jobs:
-  build-tauri:
-    permissions:
-      contents: write
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: 'macos-latest'
-            os-name: 'macos'
+            os: 'macos'
           - platform: 'windows-latest'
-            os-name: 'windows'
+            os: 'windows'
 
     runs-on: ${{ matrix.platform }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,35 +44,38 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm install
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: "${{ github.ref_type == 'tag' && github.ref_name || '' }}"
-          releaseName: "Vi Drop ${{ github.ref_name }}"
-          releaseBody: "Phiên bản mới nhất của ứng dụng Vi Drop dành cho Windows và macOS."
-          releaseDraft: false
-          prerelease: false
+      - name: Build Tauri Application
+        run: npx tauri build
 
-      - name: Upload Artifacts (macOS)
-        if: matrix.os-name == 'macos'
+      - name: Upload macOS Artifacts
+        if: matrix.os == 'macos'
         uses: actions/upload-artifact@v4
         with:
-          name: Vi-Drop-macOS
+          name: ViDrop-macOS
           path: |
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/macos/*.app
           if-no-files-found: warn
 
-      - name: Upload Artifacts (Windows)
-        if: matrix.os-name == 'windows'
+      - name: Upload Windows Artifacts
+        if: matrix.os == 'windows'
         uses: actions/upload-artifact@v4
         with:
-          name: Vi-Drop-Windows
+          name: ViDrop-Windows
           path: |
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: warn
+
+      - name: Publish GitHub Release (Only on Tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi

@@ -1,11 +1,13 @@
-cat << 'EOF' > .gitignore
-# Thư mục thư viện và file biên dịch nặng
+# Dependencies
 node_modules/
+package-lock.json.backup
+
+# Build outputs
 dist/
 src-tauri/target/
 
-# File hệ thống
+# System and logs
 .DS_Store
 Thumbs.db
 *.log
-EOF
+*.tmp

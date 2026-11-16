@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Vi Drop - Tải file lên máy tính</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --dropzone-bg: #f8fafc;
+      --dropzone-border: #cbd5e1;
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
+      --success: #10b981;
+      --danger: #ef4444;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --item-bg: #f1f5f9;
+      --item-border: #e2e8f0;
+      --progress-bg: #e2e8f0;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --card-border: #334155;
+        --dropzone-bg: rgba(15, 23, 42, 0.5);
+        --dropzone-border: #475569;
+        --primary: #38bdf8;
+        --primary-hover: #0284c7;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --item-bg: rgba(15, 23, 42, 0.6);
+        --item-border: rgba(51, 65, 85, 0.6);
+        --progress-bg: #334155;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.25rem 1rem;
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .badge-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #059669;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 9999px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .badge-live {
+        color: #34d399;
+      }
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      background-color: #10b981;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+    }
+
+    .dropzone {
+      border: 2px dashed var(--dropzone-border);
+      border-radius: 12px;
+      padding: 1.75rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: var(--dropzone-bg);
+    }
+
+    .dropzone:active, .dropzone.dragover {
+      border-color: var(--primary);
+      background: rgba(2, 132, 199, 0.08);
+    }
+
+    .dropzone-icon {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 0.75rem auto;
+      color: var(--primary);
+    }
+
+    .dropzone-text {
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .dropzone-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    .file-list {
+      margin-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 0.8rem;
+      background: var(--item-bg);
+      border: 1px solid var(--item-border);
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+
+    .file-name {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+    }
+
+    .file-size {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-left: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 0.9rem;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: white;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+      background: #1d4ed8;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Progress section */
+    .progress-box {
+      display: none;
+      margin-top: 1rem;
+      background: var(--item-bg);
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 10px;
+      background-color: var(--progress-bg);
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #38bdf8, #3b82f6, #10b981);
+      border-radius: 9999px;
+      transition: width 0.15s ease-out;
+    }
+
+    .progress-stats {
+      margin-top: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Status Alert */
+    .alert {
+      display: none;
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      line-height: 1.4;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #059669;
+    }
+
+    .alert-error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #dc2626;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: auto;
+      padding-top: 1.5rem;
+    }
+
+    .security-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div>
+          <div class="brand-title">Vi Drop</div>
+          <div class="brand-subtitle">Truyền file nội bộ Wi-Fi</div>
+        </div>
+      </div>
+      <div class="badge-live">
+        <div class="badge-dot"></div>
+        <span>Đã kết nối</span>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+        <svg class="dropzone-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+        <div class="dropzone-text">Chạm để chọn file hoặc kéo thả</div>
+        <div class="dropzone-sub">Hỗ trợ mọi định dạng: Ảnh, Video, Tài liệu (lên đến 10GB)</div>
+      </div>
+
+      <input type="file" id="fileInput" multiple />
+
+      <div class="file-list" id="fileList"></div>
+
+      <div class="progress-box" id="progressBox">
+        <div class="progress-header">
+          <span id="progressStatus">Đang tải lên...</span>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+        <div class="progress-stats">
+          <span id="progressLoaded">0 MB / 0 MB</span>
+          <span id="progressSpeed">-- MB/s</span>
+        </div>
+      </div>
+
+      <div class="alert alert-success" id="alertSuccess">
+        <span>✅ Đã truyền file thành công sang máy tính!</span>
+      </div>
+
+      <div class="alert alert-error" id="alertError">
+        <span id="alertErrorText">❌ Lỗi tải lên. Vui lòng thử lại.</span>
+      </div>
+
+      <div style="margin-top: 1rem;">
+        <button class="btn btn-primary" id="btnUpload" disabled onclick="startUpload()">
+          <span>Gửi sang máy tính</span>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="security-note">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+      <span>Mã hóa và truyền trực tiếp qua mạng LAN, không qua máy chủ đám mây.</span>
+    </div>
+
+    <div class="footer">
+      Vi Drop Mobile Client • Session Token: <strong id="tokenPreview">...</strong>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token') || '';
+    if (token) {
+      document.getElementById('tokenPreview').innerText = token.substring(0, 8) + '...';
+    }
+
+    const fileInput = document.getElementById('fileInput');
+    const fileListEl = document.getElementById('fileList');
+    const btnUpload = document.getElementById('btnUpload');
+    const progressBox = document.getElementById('progressBox');
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    const progressLoaded = document.getElementById('progressLoaded');
+    const progressSpeed = document.getElementById('progressSpeed');
+    const alertSuccess = document.getElementById('alertSuccess');
+    const alertError = document.getElementById('alertError');
+    const alertErrorText = document.getElementById('alertErrorText');
+    const dropzone = document.getElementById('dropzone');
+
+    let selectedFiles = [];
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+    }
+
+    function renderFileList() {
+      fileListEl.innerHTML = '';
+      if (selectedFiles.length === 0) {
+        btnUpload.disabled = true;
+        return;
+      }
+      btnUpload.disabled = false;
+
+      selectedFiles.forEach((file) => {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        item.innerHTML = `
+          <div class="file-name" title="${file.name}">${file.name}</div>
+          <div class="file-size">${formatBytes(file.size)}</div>
+        `;
+        fileListEl.appendChild(item);
+      });
+    }
+
+    fileInput.addEventListener('change', (e) => {
+      selectedFiles = Array.from(e.target.files);
+      alertSuccess.style.display = 'none';
+      alertError.style.display = 'none';
+      renderFileList();
+    });
+
+    // Drag and drop support
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+      }, false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      if (dt && dt.files && dt.files.length > 0) {
+        selectedFiles = Array.from(dt.files);
+        renderFileList();
+      }
+    });
+
+    function startUpload() {
+      if (selectedFiles.length === 0) return;
+      if (!token) {
+        alertError.style.display = 'flex';
+        alertErrorText.innerText = 'Thiếu mã token xác thực. Hãy quét lại mã QR trên màn hình máy tính.';
+        return;
+      }
+
+      const formData = new FormData();
+      for (let i = 0; i < selectedFiles.length; i++) {
+        formData.append('files', selectedFiles[i]);
+      }
+
+      btnUpload.disabled = true;
+      progressBox.style.display = 'block';
+      alertSuccess.style.display = 'none';
+      alertError.style.display = 'none';
+      progressBar.style.width = '0%';
+      progressPercent.innerText = '0%';
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `/upload?token=${encodeURIComponent(token)}`, true);
+
+      let startTime = Date.now();
+      let prevLoaded = 0;
+      let prevTime = startTime;
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          progressBar.style.width = percent + '%';
+          progressPercent.innerText = percent + '%';
+          progressLoaded.innerText = `${formatBytes(event.loaded)} / ${formatBytes(event.total)}`;
+
+          const now = Date.now();
+          const timeDiff = (now - prevTime) / 1000;
+          if (timeDiff >= 0.5) {
+            const bytesDiff = event.loaded - prevLoaded;
+            const speed = bytesDiff / timeDiff; // bytes/sec
+            progressSpeed.innerText = `${formatBytes(speed)}/s`;
+            prevLoaded = event.loaded;
+            prevTime = now;
+          }
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          progressBar.style.width = '100%';
+          progressPercent.innerText = '100%';
+          alertSuccess.style.display = 'flex';
+          fileInput.value = '';
+          selectedFiles = [];
+          renderFileList();
+          btnUpload.innerHTML = `<span>Gửi thêm file</span>`;
+          btnUpload.disabled = false;
+        } else {
+          let errDetail = 'Lỗi truyền file';
+          try {
+            errDetail = xhr.responseText || `Mã lỗi: ${xhr.status}`;
+          } catch(e) {}
+          alertError.style.display = 'flex';
+          alertErrorText.innerText = `❌ ${errDetail}`;
+          btnUpload.disabled = false;
+        }
+      };
+
+      xhr.onerror = () => {
+        alertError.style.display = 'flex';
+        alertErrorText.innerText = 'Không thể kết nối tới máy tính. Vui lòng kiểm tra kết nối Wi-Fi cùng mạng LAN.';
+        btnUpload.disabled = false;
+      };
+
+      xhr.send(formData);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vi Drop - Nhận File An Toàn Qua Wi-Fi</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Bar -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-badge">⚡</div>
+        <div>
+          <h1 class="brand-title">Vi Drop</h1>
+          <p class="brand-tagline">Truyền file nội bộ P2P qua Wi-Fi • Mã hóa & Tốc độ cao</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <!-- Theme Toggle Button -->
+        <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Chuyển chế độ Sáng / Tối">
+          <span class="theme-icon" id="themeIcon">🌙</span>
+          <span class="theme-text" id="themeText">Giao diện tối</span>
+        </button>
+
+        <div class="network-pill" id="networkPill">
+          <span class="status-indicator"></span>
+          <span id="networkText">Khởi động máy chủ...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main 2-Column Content -->
+    <main class="main-content">
+      <!-- Left Column: QR Code & Server Controls -->
+      <section class="left-panel">
+        <div class="panel-card qr-card">
+          <div class="card-header">
+            <h2 class="card-title">Mã QR Kết Nối</h2>
+            <span class="badge" id="qrStatusBadge">Đang hiệu lực</span>
+          </div>
+          <p class="card-desc">Dùng camera iPhone hoặc Android để quét mã và gửi file</p>
+
+          <div class="qr-wrapper">
+            <div class="qr-container" id="qrContainer">
+              <div class="qr-placeholder">Đang tạo mã QR...</div>
+            </div>
+            <div class="qr-overlay" id="qrOverlay">
+              <div class="expired-icon">⏳</div>
+              <div class="expired-title">Mã QR đã hết hạn</div>
+              <div class="expired-desc">Quá hạn 5 phút bảo mật</div>
+              <button class="btn btn-secondary btn-sm" onclick="handleRefreshToken()">Tạo mã mới</button>
+            </div>
+          </div>
+
+          <!-- Countdown Timer -->
+          <div class="timer-section">
+            <div class="timer-bar-bg">
+              <div class="timer-bar-fill" id="timerBar"></div>
+            </div>
+            <div class="timer-info">
+              <span class="timer-label">Hết hạn sau:</span>
+              <span class="timer-countdown" id="timerCountdown">05:00</span>
+            </div>
+          </div>
+
+          <div class="action-buttons">
+            <button class="btn btn-primary" id="btnRefresh" onclick="handleRefreshToken()">
+              <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Tạo mã QR mới</span>
+            </button>
+            <button class="btn btn-outline" id="btnCopyLink" onclick="handleCopyLink()" title="Sao chép link web tải file">
+              <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span>Sao chép link</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Directory Info Card -->
+        <div class="panel-card dir-card">
+          <div class="dir-header">
+            <div class="dir-icon">📁</div>
+            <div class="dir-details">
+              <span class="dir-label">Thư mục lưu file:</span>
+              <span class="dir-path" id="dirPath" title="Downloads/ViDrop">~/Downloads/ViDrop</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary w-full" onclick="handleOpenDirectory()">
+            <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+            </svg>
+            <span>Mở thư mục lưu</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Right Column: Real-time Received Files List -->
+      <section class="right-panel">
+        <div class="panel-card files-card">
+          <div class="files-header">
+            <div class="files-title-box">
+              <h2 class="card-title">File đã nhận trong phiên</h2>
+              <span class="count-badge" id="filesCountBadge">0 file</span>
+            </div>
+            <div class="files-actions-box">
+              <span class="total-size" id="totalSizeText">Tổng: 0 MB</span>
+              <button class="btn btn-danger-outline btn-xs" id="btnClearAll" onclick="handleClearAll()" style="display:none;" title="Xóa tất cả khỏi danh sách">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>Xóa tất cả</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div class="empty-state" id="emptyState">
+            <div class="empty-art">📲</div>
+            <h3 class="empty-title">Sẵn sàng nhận file từ điện thoại</h3>
+            <p class="empty-desc">
+              Quét mã QR bên cạnh bằng điện thoại của bạn (iOS hoặc Android) để bắt đầu gửi ảnh, video hoặc tài liệu không giới hạn dung lượng.
+            </p>
+            <div class="empty-steps">
+              <div class="step-item">
+                <span class="step-num">1</span>
+                <span>Kết nối cùng Wi-Fi</span>
+              </div>
+              <div class="step-item">
+                <span class="step-num">2</span>
+                <span>Quét mã QR bằng Camera</span>
+              </div>
+              <div class="step-item">
+                <span class="step-num">3</span>
+                <span>Chọn file và nhấn Gửi</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Files List Container -->
+          <div class="files-list" id="filesList"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

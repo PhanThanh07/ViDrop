@@ -1,0 +1,11 @@
+cat << 'EOF' > .gitignore
+# Thư mục thư viện và file biên dịch nặng
+node_modules/
+dist/
+src-tauri/target/
+
+# File hệ thống
+.DS_Store
+Thumbs.db
+*.log
+EOF

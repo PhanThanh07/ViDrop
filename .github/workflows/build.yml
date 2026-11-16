@@ -52,9 +52,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
-          releaseName: 'Vi Drop ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}'
-          releaseBody: 'Phiên bản mới nhất của ứng dụng Vi Drop dành cho Windows và macOS.'
+          tagName: "${{ github.ref_type == 'tag' && github.ref_name || '' }}"
+          releaseName: "Vi Drop ${{ github.ref_name }}"
+          releaseBody: "Phiên bản mới nhất của ứng dụng Vi Drop dành cho Windows và macOS."
           releaseDraft: false
           prerelease: false
 

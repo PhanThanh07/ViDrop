@@ -37,6 +37,33 @@ const themeToggleBtn = document.getElementById('themeToggleBtn');
 const themeIcon = document.getElementById('themeIcon');
 const themeText = document.getElementById('themeText');
 
+// Modal Elements
+const confirmModal = document.getElementById('confirmModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalDesc = document.getElementById('modalDesc');
+const modalBtnConfirm = document.getElementById('modalBtnConfirm');
+let onModalConfirmCallback = null;
+
+function showConfirmModal({ title, desc, confirmText, onConfirm }) {
+  modalTitle.textContent = title || 'Xác nhận';
+  modalDesc.textContent = desc || 'Bạn có chắc chắn muốn thực hiện hành động này?';
+  modalBtnConfirm.textContent = confirmText || 'Xác nhận';
+  onModalConfirmCallback = onConfirm;
+  confirmModal.classList.add('show');
+}
+
+function closeConfirmModal() {
+  confirmModal.classList.remove('show');
+  onModalConfirmCallback = null;
+}
+
+modalBtnConfirm.addEventListener('click', () => {
+  if (onModalConfirmCallback) {
+    onModalConfirmCallback();
+  }
+  closeConfirmModal();
+});
+
 // ----------------- Theme Management -----------------
 function initTheme() {
   const savedTheme = localStorage.getItem('vidrop-theme') || 'light';
@@ -199,7 +226,7 @@ function renderFilesList() {
         </div>
       </div>
       <div class="file-row-actions">
-        <button class="btn btn-outline btn-sm" onclick="handleOpenFile('${file.path.replace(/\\/g, '\\\\')}')" title="Định vị file">
+        <button class="btn btn-outline btn-sm" onclick="handleOpenFileById('${file.id}')" title="Định vị file">
           <span>Xem file</span>
         </button>
         <button class="btn-icon-danger" onclick="handleDeleteFile('${file.id}')" title="Xóa khỏi danh sách">
@@ -237,21 +264,34 @@ async function handleDeleteFile(id) {
 
 async function handleClearAll() {
   if (!receivedFiles || receivedFiles.length === 0) return;
-  if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ danh sách file đã nhận không? (File trên đĩa vẫn được giữ nguyên)')) {
-    return;
-  }
 
-  const invoke = getTauriInvoke();
-  if (!invoke) return;
+  showConfirmModal({
+    title: 'Xóa toàn bộ danh sách?',
+    desc: 'Danh sách các file đã nhận trong phiên sẽ bị xóa khỏi giao diện. Các file đã tải về trong thư mục ViDrop vẫn được giữ nguyên trên đĩa.',
+    confirmText: 'Xóa tất cả',
+    onConfirm: async () => {
+      const invoke = getTauriInvoke();
+      if (!invoke) return;
 
-  try {
-    const updated = await invoke('clear_received_files');
-    receivedFiles = updated || [];
-    renderFilesList();
-    showToast('🧹 Đã dọn sạch danh sách file');
-  } catch (err) {
-    console.error('Clear files error:', err);
-    showToast('❌ Lỗi khi xóa danh sách');
+      try {
+        const updated = await invoke('clear_received_files');
+        receivedFiles = updated || [];
+        renderFilesList();
+        showToast('🧹 Đã dọn sạch danh sách file');
+      } catch (err) {
+        console.error('Clear files error:', err);
+        showToast('❌ Lỗi khi xóa danh sách');
+      }
+    }
+  });
+}
+
+function handleOpenFileById(id) {
+  const file = receivedFiles.find((f) => f.id === id);
+  if (file && file.path) {
+    handleOpenFile(file.path);
+  } else {
+    showToast('❌ Không tìm thấy đường dẫn file');
   }
 }
 

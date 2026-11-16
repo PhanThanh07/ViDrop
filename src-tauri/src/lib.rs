@@ -368,8 +368,9 @@ fn open_dir_native(path: &str) -> Result<(), String> {
     }
     #[cfg(target_os = "windows")]
     {
+        let win_path = path.replace('/', "\\");
         std::process::Command::new("explorer")
-            .arg(path)
+            .arg(&win_path)
             .spawn()
             .map_err(|e| format!("Lỗi mở thư mục: {}", e))?;
     }
@@ -394,10 +395,21 @@ fn open_file_native(path: &str) -> Result<(), String> {
     }
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(format!("/select,\"{}\"", path))
-            .spawn()
-            .map_err(|e| format!("Lỗi định vị file: {}", e))?;
+        use std::path::Path;
+        let p = Path::new(path);
+        let win_path = path.replace('/', "\\");
+        if p.exists() {
+            std::process::Command::new("explorer")
+                .arg(format!("/select,{}", win_path))
+                .spawn()
+                .map_err(|e| format!("Lỗi định vị file: {}", e))?;
+        } else if let Some(parent) = p.parent() {
+            let win_parent = parent.to_string_lossy().replace('/', "\\");
+            std::process::Command::new("explorer")
+                .arg(&win_parent)
+                .spawn()
+                .map_err(|e| format!("Lỗi mở thư mục: {}", e))?;
+        }
     }
     #[cfg(target_os = "linux")]
     {

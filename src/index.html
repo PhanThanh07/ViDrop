@@ -147,6 +147,19 @@
       </section>
     </main>
 
+    <!-- Custom Confirmation Modal (Cross-platform) -->
+    <div class="modal-backdrop" id="confirmModal">
+      <div class="modal-card">
+        <div class="modal-icon">⚠️</div>
+        <h3 class="modal-title" id="modalTitle">Xác nhận</h3>
+        <p class="modal-desc" id="modalDesc">Bạn có chắc chắn muốn thực hiện hành động này?</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="closeConfirmModal()">Hủy</button>
+          <button class="btn btn-danger" id="modalBtnConfirm">Xác nhận xóa</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notification -->
     <div class="toast" id="toast"></div>
   </div>

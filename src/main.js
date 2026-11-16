@@ -64,6 +64,16 @@ modalBtnConfirm.addEventListener('click', () => {
   closeConfirmModal();
 });
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // ----------------- Theme Management -----------------
 function initTheme() {
   const savedTheme = localStorage.getItem('vidrop-theme') || 'light';
@@ -211,17 +221,18 @@ function renderFilesList() {
 
   sorted.forEach((file) => {
     const meta = getFileIconMeta(file.filename);
+    const safeFilename = escapeHtml(file.filename);
     const row = document.createElement('div');
     row.className = 'file-row';
     row.innerHTML = `
       <div class="file-row-left">
         <div class="file-icon-box ${meta.className}">${meta.icon}</div>
         <div class="file-info">
-          <div class="file-name" title="${file.filename}">${file.filename}</div>
+          <div class="file-name" title="${safeFilename}">${safeFilename}</div>
           <div class="file-meta">
-            <span>${file.size_formatted}</span>
+            <span>${escapeHtml(file.size_formatted)}</span>
             <span>•</span>
-            <span>${file.received_at}</span>
+            <span>${escapeHtml(file.received_at)}</span>
           </div>
         </div>
       </div>

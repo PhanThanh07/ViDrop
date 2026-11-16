@@ -200,6 +200,7 @@
       border: 1px solid var(--item-border);
       border-radius: 8px;
       font-size: 0.85rem;
+      min-width: 0;
     }
 
     .file-name {
@@ -207,13 +208,16 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 220px;
+      flex: 1;
+      min-width: 0;
+      margin-right: 0.75rem;
+      word-break: break-all;
     }
 
     .file-size {
       color: var(--text-muted);
       font-size: 0.75rem;
-      margin-left: 0.5rem;
+      margin-left: auto;
       flex-shrink: 0;
     }
 

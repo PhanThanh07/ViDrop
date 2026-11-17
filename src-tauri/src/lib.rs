@@ -244,6 +244,10 @@ fn sanitize_filename(raw_name: &str) -> String {
     format!("{}{}", timestamp, safe)
 }
 
+fn current_date_folder_name() -> String {
+    Local::now().format("%d-%m-%Y").to_string()
+}
+
 #[derive(Deserialize)]
 struct AuthQuery {
     token: Option<String>,
@@ -409,6 +413,14 @@ async fn handle_upload(
     state.consume_transfer_approval(req_id);
 
     let mut saved_files = Vec::new();
+    let base_dir = state.save_dir.read().unwrap().clone();
+    let daily_dir = base_dir.join(current_date_folder_name());
+    tokio::fs::create_dir_all(&daily_dir).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Không thể tạo thư mục lưu theo ngày: {}", e),
+        )
+    })?;
 
     while let Some(mut field) = multipart
         .next_field()
@@ -421,7 +433,7 @@ async fn handle_upload(
             .to_string();
 
         let final_filename = sanitize_filename(&raw_filename);
-        let destination_path = state.save_dir.read().unwrap().join(&final_filename);
+        let destination_path = daily_dir.join(&final_filename);
 
         use tokio::io::AsyncWriteExt;
         let mut out_file = tokio::fs::File::create(&destination_path).await.map_err(|e| {
@@ -975,6 +987,16 @@ mod tests {
         let new_dir = PathBuf::from("/tmp/vidrop_custom");
         *dir_lock.write().unwrap() = new_dir.clone();
         assert_eq!(*dir_lock.read().unwrap(), new_dir);
+    }
+
+    #[test]
+    fn test_current_date_folder_name_format() {
+        let folder = current_date_folder_name();
+        let parts: Vec<&str> = folder.split('-').collect();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0].len(), 2); // DD
+        assert_eq!(parts[1].len(), 2); // MM
+        assert_eq!(parts[2].len(), 4); // YYYY
     }
 }
 

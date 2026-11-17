@@ -1,6 +1,6 @@
 [package]
 name = "vidrop"
-version = "1.0.3"
+version = "1.0.4"
 description = "Vi Drop Desktop App"
 authors = ["Vi Drop"]
 edition = "2021"

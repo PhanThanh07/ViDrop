@@ -37,6 +37,20 @@ const themeToggleBtn = document.getElementById('themeToggleBtn');
 const themeIcon = document.getElementById('themeIcon');
 const themeText = document.getElementById('themeText');
 
+// Update UI Elements
+const btnCheckUpdate = document.getElementById('btnCheckUpdate');
+const updateBtnText = document.getElementById('updateBtnText');
+const updateBanner = document.getElementById('updateBanner');
+const updateVersionTitle = document.getElementById('updateVersionTitle');
+const updateChangelog = document.getElementById('updateChangelog');
+const updateProgressModal = document.getElementById('updateProgressModal');
+const updateProgressBar = document.getElementById('updateProgressBar');
+const updateProgressPercent = document.getElementById('updateProgressPercent');
+const updateProgressSize = document.getElementById('updateProgressSize');
+const updateStatusMsg = document.getElementById('updateStatusMsg');
+let currentUpdateInfo = null;
+let isUpdating = false;
+
 // Modal Elements
 const confirmModal = document.getElementById('confirmModal');
 const modalTitle = document.getElementById('modalTitle');
@@ -361,6 +375,86 @@ async function handleOpenDirectory() {
   }
 }
 
+// ----------------- Auto Updater Handlers -----------------
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function showUpdateBanner(info) {
+  if (!info || !info.version) return;
+  currentUpdateInfo = info;
+  updateVersionTitle.textContent = `⚡ Đã có Vi Drop v${info.version}!`;
+  if (info.body) {
+    const cleanBody = info.body.replace(/\r\n/g, ' ').replace(/\n/g, ' ').trim();
+    updateChangelog.textContent = cleanBody.length > 70 ? cleanBody.substring(0, 70) + '...' : cleanBody;
+  } else {
+    updateChangelog.textContent = 'Nhấn Cập nhật ngay để tải và cài đặt tự động.';
+  }
+  updateBanner.style.display = 'flex';
+}
+
+function dismissUpdateBanner() {
+  updateBanner.style.display = 'none';
+}
+
+async function handleManualCheckUpdate() {
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+
+  try {
+    updateBtnText.textContent = 'Đang tìm...';
+    btnCheckUpdate.disabled = true;
+
+    const res = await invoke('check_update');
+    if (res && res.available && res.version) {
+      showUpdateBanner(res);
+      showToast(`🚀 Phát hiện phiên bản mới: v${res.version}`);
+    } else {
+      const verText = res && res.current_version ? ` (v${res.current_version})` : '';
+      showToast(`✅ Bạn đang dùng phiên bản mới nhất${verText}`);
+    }
+  } catch (err) {
+    console.error('Check update error:', err);
+    showToast(`⚠️ Không thể kiểm tra: ${err}`);
+  } finally {
+    updateBtnText.textContent = 'Cập nhật';
+    btnCheckUpdate.disabled = false;
+  }
+}
+
+async function handleStartUpdate() {
+  if (isUpdating) return;
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+
+  isUpdating = true;
+  dismissUpdateBanner();
+
+  // Hiển thị modal tiến trình
+  updateProgressModal.classList.add('show');
+  updateProgressBar.style.width = '0%';
+  updateProgressPercent.textContent = '0%';
+  updateProgressSize.textContent = 'Đang chuẩn bị tải...';
+  updateStatusMsg.textContent = 'Đang kết nối đến GitHub để tải bản cập nhật...';
+
+  try {
+    await invoke('install_update');
+    // Khi hoàn tất thành công, backend sẽ gọi app.restart() để khởi động lại ứng dụng
+  } catch (err) {
+    console.error('Install update error:', err);
+    isUpdating = false;
+    updateStatusMsg.textContent = `❌ Lỗi: ${err}`;
+    setTimeout(() => {
+      updateProgressModal.classList.remove('show');
+      showToast(`❌ Cập nhật thất bại: ${err}`);
+    }, 4000);
+  }
+}
+
 // App Initialization
 window.addEventListener('DOMContentLoaded', async () => {
   initTheme();
@@ -405,6 +499,29 @@ async function initTauri() {
       await listen('token-refreshed', (event) => {
         if (event && event.payload) {
           updateServerInfoUI(event.payload);
+        }
+      });
+
+      // Lắng nghe thông báo cập nhật tự động
+      await listen('update-available', (event) => {
+        if (event && event.payload) {
+          showUpdateBanner(event.payload);
+        }
+      });
+
+      // Lắng nghe tiến trình tải bản cập nhật
+      await listen('update-download-progress', (event) => {
+        if (event && event.payload) {
+          const { downloaded, total } = event.payload;
+          if (total && total > 0) {
+            const pct = Math.min(100, Math.round((downloaded / total) * 100));
+            updateProgressBar.style.width = `${pct}%`;
+            updateProgressPercent.textContent = `${pct}%`;
+            updateProgressSize.textContent = `${formatBytes(downloaded)} / ${formatBytes(total)}`;
+            if (pct >= 100) {
+              updateStatusMsg.textContent = 'Tải xong! Đang cài đặt và khởi động lại ứng dụng...';
+            }
+          }
         }
       });
     }

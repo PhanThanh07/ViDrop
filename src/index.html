@@ -18,6 +18,12 @@
         </div>
       </div>
       <div class="header-right">
+        <!-- Check Update Button -->
+        <button class="theme-toggle-btn" id="btnCheckUpdate" onclick="handleManualCheckUpdate()" title="Kiểm tra bản cập nhật mới">
+          <span class="theme-icon">🔄</span>
+          <span class="theme-text" id="updateBtnText">Cập nhật</span>
+        </button>
+
         <!-- Theme Toggle Button -->
         <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Chuyển chế độ Sáng / Tối">
           <span class="theme-icon" id="themeIcon">🌙</span>
@@ -30,6 +36,23 @@
         </div>
       </div>
     </header>
+
+    <!-- Update Notification Banner -->
+    <div class="update-banner" id="updateBanner" style="display: none;">
+      <div class="update-banner-content">
+        <span class="update-badge">Mới</span>
+        <div class="update-info">
+          <strong id="updateVersionTitle">Đã có bản cập nhật mới!</strong>
+          <span class="update-changelog-preview" id="updateChangelog">Nhấn để cập nhật ngay.</span>
+        </div>
+      </div>
+      <div class="update-banner-actions">
+        <button class="btn btn-primary btn-sm" id="btnApplyUpdate" onclick="handleStartUpdate()">
+          <span>Cập nhật ngay</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="dismissUpdateBanner()" title="Để sau">✕</button>
+      </div>
+    </div>
 
     <!-- Main 2-Column Content -->
     <main class="main-content">
@@ -157,6 +180,25 @@
           <button class="btn btn-outline" onclick="closeConfirmModal()">Hủy</button>
           <button class="btn btn-danger" id="modalBtnConfirm">Xác nhận xóa</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Update Progress Modal -->
+    <div class="modal-backdrop" id="updateProgressModal">
+      <div class="modal-card">
+        <div class="modal-icon">🚀</div>
+        <h3 class="modal-title" id="updateProgressTitle">Đang cập nhật Vi Drop...</h3>
+        <p class="modal-desc" id="updateProgressDesc">Đang tải xuống phiên bản mới từ GitHub...</p>
+        
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="updateProgressBar" style="width: 0%;"></div>
+        </div>
+        <div class="progress-details">
+          <span id="updateProgressPercent">0%</span>
+          <span id="updateProgressSize">Đang kết nối...</span>
+        </div>
+
+        <div class="update-status-msg" id="updateStatusMsg">Ứng dụng sẽ tự động khởi động lại sau khi cài đặt.</div>
       </div>
     </div>
 

@@ -11,3 +11,8 @@ src-tauri/target/
 Thumbs.db
 *.log
 *.tmp
+
+# Signing keys
+*.key
+*.key.pub
+vidrop_signing.key*

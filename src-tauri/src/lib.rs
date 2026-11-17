@@ -14,6 +14,7 @@ use qrcode::QrCode;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_updater::UpdaterExt;
 use tower_http::cors::CorsLayer;
 
 const SESSION_DURATION_SECS: u64 = 300; // 5 minutes
@@ -380,6 +381,80 @@ fn reveal_received_file(id: String, state: tauri::State<Arc<AppState>>) -> Resul
     reveal_in_folder(&path)
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct UpdateMetadata {
+    pub available: bool,
+    pub current_version: String,
+    pub version: Option<String>,
+    pub date: Option<String>,
+    pub body: Option<String>,
+}
+
+#[tauri::command]
+async fn check_update(app: tauri::AppHandle) -> Result<UpdateMetadata, String> {
+    let current_version = app.package_info().version.to_string();
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(_) => {
+            return Ok(UpdateMetadata {
+                available: false,
+                current_version,
+                version: None,
+                date: None,
+                body: None,
+            })
+        }
+    };
+
+    match updater.check().await {
+        Ok(Some(update)) => Ok(UpdateMetadata {
+            available: true,
+            current_version,
+            version: Some(update.version.clone()),
+            date: update.date.map(|d| d.to_string()),
+            body: update.body.clone(),
+        }),
+        Ok(None) => Ok(UpdateMetadata {
+            available: false,
+            current_version,
+            version: None,
+            date: None,
+            body: None,
+        }),
+        Err(e) => Err(format!("Lỗi kiểm tra cập nhật: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    if let Some(update) = updater.check().await.map_err(|e| e.to_string())? {
+        let mut downloaded_bytes: u64 = 0;
+        let app_handle = app.clone();
+        update
+            .download_and_install(
+                move |chunk_length, content_length| {
+                    downloaded_bytes += chunk_length as u64;
+                    let _ = app_handle.emit(
+                        "update-download-progress",
+                        serde_json::json!({
+                            "chunk": chunk_length,
+                            "downloaded": downloaded_bytes,
+                            "total": content_length,
+                        }),
+                    );
+                },
+                || {},
+            )
+            .await
+            .map_err(|e| format!("Lỗi cài đặt bản cập nhật: {}", e))?;
+
+        app.restart();
+    } else {
+        Err("Không có bản cập nhật nào khả dụng".to_string())
+    }
+}
+
 fn open_dir_native(path: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -471,7 +546,27 @@ fn reveal_in_folder(path: &Path) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            // Check for updates in background after 3 seconds
+            let handle_for_bg_update = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                if let Ok(updater) = handle_for_bg_update.updater() {
+                    if let Ok(Some(update)) = updater.check().await {
+                        let _ = handle_for_bg_update.emit(
+                            "update-available",
+                            serde_json::json!({
+                                "version": update.version,
+                                "body": update.body,
+                                "date": update.date.map(|d| d.to_string()),
+                            }),
+                        );
+                    }
+                }
+            });
+
             // Determine save directory: Downloads/ViDrop
             let save_dir = dirs::download_dir()
                 .unwrap_or_else(|| PathBuf::from("."))
@@ -526,6 +621,24 @@ pub fn run() {
                 }
             });
 
+            // Tự động kiểm tra bản cập nhật sau 3 giây khi khởi động
+            let handle_for_updater = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                if let Ok(updater) = handle_for_updater.updater() {
+                    if let Ok(Some(update)) = updater.check().await {
+                        let _ = handle_for_updater.emit(
+                            "update-available",
+                            serde_json::json!({
+                                "version": update.version,
+                                "date": update.date.map(|d| d.to_string()),
+                                "body": update.body,
+                            }),
+                        );
+                    }
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -536,7 +649,9 @@ pub fn run() {
             clear_received_files,
             open_save_directory,
             open_received_file,
-            reveal_received_file
+            reveal_received_file,
+            check_update,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

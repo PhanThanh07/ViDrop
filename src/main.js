@@ -134,9 +134,10 @@ function updateTimerUI() {
     timerCountdown.className = 'timer-countdown expired';
     timerBar.className = 'timer-bar-fill expired';
     timerBar.style.width = '0%';
-    qrOverlay.classList.add('visible');
-    qrStatusBadge.textContent = 'Đã hết hạn';
-    qrStatusBadge.className = 'badge expired';
+    if (qrStatusBadge) {
+      qrStatusBadge.textContent = 'Đang làm mới...';
+      qrStatusBadge.className = 'badge expired';
+    }
     return;
   }
 
@@ -147,15 +148,19 @@ function updateTimerUI() {
   if (remainingSeconds <= 60) {
     timerCountdown.className = 'timer-countdown warning';
     timerBar.className = 'timer-bar-fill warning';
-    qrStatusBadge.textContent = 'Sắp hết hạn';
-    qrStatusBadge.className = 'badge expired';
+    if (qrStatusBadge) {
+      qrStatusBadge.textContent = 'Sắp làm mới';
+      qrStatusBadge.className = 'badge expired';
+    }
   } else {
     timerCountdown.className = 'timer-countdown';
     timerBar.className = 'timer-bar-fill';
-    qrStatusBadge.textContent = 'Đang hiệu lực';
-    qrStatusBadge.className = 'badge';
+    if (qrStatusBadge) {
+      qrStatusBadge.textContent = 'Đang hiệu lực';
+      qrStatusBadge.className = 'badge';
+    }
   }
-  qrOverlay.classList.remove('visible');
+  if (qrOverlay) qrOverlay.classList.remove('visible');
 }
 
 function startCountdown() {
@@ -168,6 +173,8 @@ function startCountdown() {
     } else {
       clearInterval(timerInterval);
       updateTimerUI();
+      // Tự động tạo lại mã QR khi hết hạn 5 phút
+      handleRefreshToken(true);
     }
   }, 1000);
 }
@@ -339,17 +346,32 @@ async function handleRevealFileById(id) {
 }
 
 // ----------------- Global Actions -----------------
-async function handleRefreshToken() {
+let isRefreshing = false;
+async function handleRefreshToken(isAuto = false) {
+  if (isRefreshing) return;
   const invoke = getTauriInvoke();
   if (!invoke) return;
+
+  isRefreshing = true;
+  const btnRefresh = document.getElementById('btnRefresh');
+  if (btnRefresh) btnRefresh.classList.add('spinning');
 
   try {
     const info = await invoke('refresh_token');
     updateServerInfoUI(info);
-    showToast('⚡ Đã tạo mã QR và Token mới!');
+    if (!isAuto) {
+      showToast('⚡ Đã làm mới mã QR!');
+    }
   } catch (err) {
     console.error('Refresh token error:', err);
-    showToast('❌ Không thể tạo mã mới');
+    if (!isAuto) {
+      showToast('❌ Không thể tạo mã mới');
+    }
+  } finally {
+    isRefreshing = false;
+    setTimeout(() => {
+      if (btnRefresh) btnRefresh.classList.remove('spinning');
+    }, 450);
   }
 }
 

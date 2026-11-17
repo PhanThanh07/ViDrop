@@ -621,6 +621,18 @@ pub fn run() {
                 }
             });
 
+            // Tự động tạo lại mã QR / token mới khi hết hạn 5 phút
+            let state_for_rotate = app_state.clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    let elapsed = state_for_rotate.created_at.read().unwrap().elapsed().as_secs();
+                    if elapsed >= SESSION_DURATION_SECS {
+                        let _ = state_for_rotate.refresh_token();
+                    }
+                }
+            });
+
             // Tự động kiểm tra bản cập nhật sau 3 giây khi khởi động
             let handle_for_updater = app.handle().clone();
             tauri::async_runtime::spawn(async move {

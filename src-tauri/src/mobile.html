@@ -464,6 +464,7 @@
       selectedFiles = Array.from(e.target.files);
       alertSuccess.style.display = 'none';
       alertError.style.display = 'none';
+      progressBox.style.display = 'none';
       renderFileList();
     });
 
@@ -486,6 +487,9 @@
       const dt = e.dataTransfer;
       if (dt && dt.files && dt.files.length > 0) {
         selectedFiles = Array.from(dt.files);
+        alertSuccess.style.display = 'none';
+        alertError.style.display = 'none';
+        progressBox.style.display = 'none';
         renderFileList();
       }
     });
@@ -543,9 +547,13 @@
           alertSuccess.style.display = 'flex';
           fileInput.value = '';
           selectedFiles = [];
+          btnUpload.innerHTML = `
+            <span>Gửi thêm file</span>
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          `;
           renderFileList();
-          btnUpload.innerHTML = `<span>Gửi thêm file</span>`;
-          btnUpload.disabled = false;
         } else {
           let errDetail = 'Lỗi truyền file';
           try {

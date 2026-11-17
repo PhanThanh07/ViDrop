@@ -933,6 +933,121 @@ body {
   margin-bottom: 1.5rem;
 }
 
+/* Transfer Confirmation Modal */
+.transfer-modal-card {
+  max-width: 440px;
+  text-align: left;
+  padding: 1.5rem;
+}
+
+.transfer-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1.1rem;
+}
+
+.transfer-modal-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.transfer-modal-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.transfer-device-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-glow);
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  align-self: flex-start;
+}
+
+.transfer-summary-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--bg-card-sub);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.transfer-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.stat-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.transfer-stat-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border-color);
+}
+
+.transfer-files-preview {
+  max-height: 140px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-sub);
+  margin-bottom: 0.85rem;
+}
+
+.transfer-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.82rem;
+}
+
+.transfer-file-item:last-child {
+  border-bottom: none;
+}
+
+.transfer-file-name {
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
+.transfer-file-size {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.transfer-confirm-msg {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 1.25rem;
+  line-height: 1.4;
+}
+
 .modal-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -183,6 +183,50 @@
       </div>
     </div>
 
+    <!-- Transfer Request Confirmation Modal -->
+    <div class="modal-backdrop" id="transferConfirmModal">
+      <div class="modal-card transfer-modal-card">
+        <div class="transfer-modal-header">
+          <div class="transfer-modal-icon">📲</div>
+          <div class="transfer-modal-titles">
+            <h3 class="modal-title">Yêu cầu nhận file</h3>
+            <p class="transfer-device-badge" id="transferDeviceName">Thiết bị di động</p>
+          </div>
+        </div>
+
+        <div class="transfer-summary-box">
+          <div class="transfer-stat">
+            <span class="stat-label">Số lượng file</span>
+            <strong class="stat-value" id="transferFileCount">0 file</strong>
+          </div>
+          <div class="transfer-stat-divider"></div>
+          <div class="transfer-stat">
+            <span class="stat-label">Tổng dung lượng</span>
+            <strong class="stat-value" id="transferTotalSize">0 MB</strong>
+          </div>
+        </div>
+
+        <div class="transfer-files-preview" id="transferFilesPreview"></div>
+
+        <p class="transfer-confirm-msg">Bạn có đồng ý nhận các file này và lưu vào máy không?</p>
+
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="btnRejectTransfer" onclick="handleTransferResponse(false)">
+            <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span>Từ chối</span>
+          </button>
+          <button class="btn btn-primary" id="btnAcceptTransfer" onclick="handleTransferResponse(true)">
+            <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Đồng ý nhận</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Update Progress Modal -->
     <div class="modal-backdrop" id="updateProgressModal">
       <div class="modal-card">

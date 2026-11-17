@@ -58,6 +58,56 @@ const modalDesc = document.getElementById('modalDesc');
 const modalBtnConfirm = document.getElementById('modalBtnConfirm');
 let onModalConfirmCallback = null;
 
+// Transfer Request Modal Elements
+const transferConfirmModal = document.getElementById('transferConfirmModal');
+const transferDeviceName = document.getElementById('transferDeviceName');
+const transferFileCount = document.getElementById('transferFileCount');
+const transferTotalSize = document.getElementById('transferTotalSize');
+const transferFilesPreview = document.getElementById('transferFilesPreview');
+let activeTransferRequestId = null;
+
+function showTransferConfirm(data) {
+  if (!data || !data.request_id) return;
+  activeTransferRequestId = data.request_id;
+  transferDeviceName.textContent = data.device_name || 'Thiết bị di động';
+  transferFileCount.textContent = `${data.files.length} file`;
+  transferTotalSize.textContent = data.total_size_formatted || formatBytes(data.total_size);
+
+  if (Array.isArray(data.files)) {
+    transferFilesPreview.innerHTML = data.files.map(f => `
+      <div class="transfer-file-item">
+        <span class="transfer-file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+        <span class="transfer-file-size">${formatBytes(f.size)}</span>
+      </div>
+    `).join('');
+  } else {
+    transferFilesPreview.innerHTML = '';
+  }
+
+  transferConfirmModal.classList.add('show');
+}
+
+async function handleTransferResponse(accept) {
+  if (!activeTransferRequestId) return;
+  const requestId = activeTransferRequestId;
+  activeTransferRequestId = null;
+  transferConfirmModal.classList.remove('show');
+
+  const invoke = getTauriInvoke();
+  if (invoke) {
+    try {
+      await invoke('respond_transfer_request', { requestId, accept });
+      if (accept) {
+        showToast(' Đã đồng ý nhận. Đang chờ thiết bị tải file...');
+      } else {
+        showToast('❌ Đã từ chối nhận file.');
+      }
+    } catch (err) {
+      console.error('Respond transfer error:', err);
+    }
+  }
+}
+
 function showConfirmModal({ title, desc, confirmText, onConfirm }) {
   modalTitle.textContent = title || 'Xác nhận';
   modalDesc.textContent = desc || 'Bạn có chắc chắn muốn thực hiện hành động này?';
@@ -521,6 +571,22 @@ async function initTauri() {
       await listen('token-refreshed', (event) => {
         if (event && event.payload) {
           updateServerInfoUI(event.payload);
+        }
+      });
+
+      // Lắng nghe sự kiện người gửi xin phép gửi file
+      await listen('transfer-request', (event) => {
+        if (event && event.payload) {
+          showTransferConfirm(event.payload);
+        }
+      });
+
+      // Lắng nghe sự kiện yêu cầu bị hủy hoặc hết hạn
+      await listen('transfer-request-cancelled', (event) => {
+        if (event && event.payload && event.payload.request_id === activeTransferRequestId) {
+          transferConfirmModal.classList.remove('show');
+          activeTransferRequestId = null;
+          showToast('⏳ Yêu cầu gửi file đã hết thời gian chờ.');
         }
       });
 

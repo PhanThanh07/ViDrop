@@ -1,5 +1,6 @@
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 use axum::{
     extract::{DefaultBodyLimit, Multipart, Query, State},
@@ -15,6 +16,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
+use tokio::sync::oneshot;
 use tower_http::cors::CorsLayer;
 
 const SESSION_DURATION_SECS: u64 = 300; // 5 minutes
@@ -43,6 +45,28 @@ pub struct ReceivedFile {
     pub path: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendFileItem {
+    pub name: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendRequestInput {
+    pub files: Vec<SendFileItem>,
+    pub device_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransferRequestEvent {
+    pub request_id: String,
+    pub files: Vec<SendFileItem>,
+    pub total_size: u64,
+    pub total_size_formatted: String,
+    pub device_name: String,
+    pub created_at: String,
+}
+
 pub struct AppState {
     pub token: RwLock<String>,
     pub created_at: RwLock<Instant>,
@@ -51,6 +75,8 @@ pub struct AppState {
     pub save_dir: PathBuf,
     pub received_files: RwLock<Vec<ReceivedFile>>,
     pub app_handle: AppHandle,
+    pub pending_transfers: Mutex<HashMap<String, oneshot::Sender<bool>>>,
+    pub approved_transfers: Mutex<HashSet<String>>,
 }
 
 impl AppState {
@@ -64,6 +90,8 @@ impl AppState {
             save_dir,
             received_files: RwLock::new(Vec::new()),
             app_handle,
+            pending_transfers: Mutex::new(HashMap::new()),
+            approved_transfers: Mutex::new(HashSet::new()),
         }
     }
 
@@ -130,6 +158,26 @@ impl AppState {
             }
         }
         false
+    }
+
+    pub fn respond_transfer(&self, request_id: &str, accept: bool) -> Result<(), String> {
+        let mut pending = self.pending_transfers.lock().unwrap();
+        if let Some(tx) = pending.remove(request_id) {
+            let _ = tx.send(accept);
+            Ok(())
+        } else {
+            Err("Yêu cầu gửi file này không tồn tại hoặc đã hết thời gian chờ".to_string())
+        }
+    }
+
+    pub fn is_transfer_approved(&self, request_id: &str) -> bool {
+        let approved = self.approved_transfers.lock().unwrap();
+        approved.contains(request_id)
+    }
+
+    pub fn consume_transfer_approval(&self, request_id: &str) {
+        let mut approved = self.approved_transfers.lock().unwrap();
+        approved.remove(request_id);
     }
 }
 
@@ -199,6 +247,12 @@ struct AuthQuery {
     token: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct AuthUploadQuery {
+    token: Option<String>,
+    request_id: Option<String>,
+}
+
 async fn handle_web_root(
     Query(query): Query<AuthQuery>,
     State(state): State<Arc<AppState>>,
@@ -235,8 +289,103 @@ async fn handle_web_root(
     (StatusCode::OK, Html(MOBILE_HTML.to_string()))
 }
 
-async fn handle_upload(
+async fn handle_request_send(
     Query(query): Query<AuthQuery>,
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<SendRequestInput>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    if !state.is_token_valid(query.token.as_deref()) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Phiên làm việc đã hết hạn hoặc mã token không hợp lệ.".to_string(),
+        ));
+    }
+
+    if payload.files.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Danh sách file gửi không được để trống.".to_string(),
+        ));
+    }
+
+    let request_id = generate_random_token()[0..12].to_string();
+    let total_bytes: u64 = payload.files.iter().map(|f| f.size).sum();
+    let total_size_formatted = format_size(total_bytes);
+    let device_name = payload
+        .device_name
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "Thiết bị di động".to_string());
+
+    let (tx, rx) = oneshot::channel::<bool>();
+    {
+        let mut pending = state.pending_transfers.lock().unwrap();
+        pending.insert(request_id.clone(), tx);
+    }
+
+    // Yêu cầu cửa sổ máy tính hiển thị / tập trung
+    if let Some(window) = state.app_handle.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+
+    // Gửi thông báo yêu cầu xác nhận tới giao diện desktop
+    let event = TransferRequestEvent {
+        request_id: request_id.clone(),
+        files: payload.files,
+        total_size: total_bytes,
+        total_size_formatted,
+        device_name,
+        created_at: Local::now().format("%H:%M:%S").to_string(),
+    };
+
+    let _ = state.app_handle.emit("transfer-request", &event);
+
+    // Chờ phản hồi từ người nhận trong tối đa 60 giây
+    match tokio::time::timeout(std::time::Duration::from_secs(60), rx).await {
+        Ok(Ok(true)) => {
+            // Người nhận đã chấp nhận!
+            {
+                let mut approved = state.approved_transfers.lock().unwrap();
+                approved.insert(request_id.clone());
+            }
+            Ok(Json(serde_json::json!({
+                "accepted": true,
+                "request_id": request_id,
+            })))
+        }
+        Ok(Ok(false)) => {
+            Err((
+                StatusCode::FORBIDDEN,
+                "Người nhận đã từ chối yêu cầu gửi file.".to_string(),
+            ))
+        }
+        Ok(Err(_)) => {
+            Err((
+                StatusCode::GONE,
+                "Yêu cầu gửi file đã bị hủy.".to_string(),
+            ))
+        }
+        Err(_) => {
+            // Hết 60s không ai bấm
+            {
+                let mut pending = state.pending_transfers.lock().unwrap();
+                pending.remove(&request_id);
+            }
+            let _ = state.app_handle.emit(
+                "transfer-request-cancelled",
+                serde_json::json!({ "request_id": request_id }),
+            );
+            Err((
+                StatusCode::REQUEST_TIMEOUT,
+                "Quá thời gian chờ người nhận phản hồi (60 giây).".to_string(),
+            ))
+        }
+    }
+}
+
+async fn handle_upload(
+    Query(query): Query<AuthUploadQuery>,
     State(state): State<Arc<AppState>>,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
@@ -246,6 +395,16 @@ async fn handle_upload(
             "Phiên làm việc đã hết hạn hoặc token không hợp lệ. Vui lòng quét lại mã QR trên máy tính.".to_string(),
         ));
     }
+
+    let req_id = query.request_id.as_deref().unwrap_or("");
+    if !state.is_transfer_approved(req_id) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Yêu cầu gửi file này chưa được người nhận chấp nhận hoặc đã hết hạn.".to_string(),
+        ));
+    }
+    // Tiêu thụ mã chấp thuận
+    state.consume_transfer_approval(req_id);
 
     let mut saved_files = Vec::new();
 
@@ -346,6 +505,15 @@ fn clear_received_files(state: tauri::State<Arc<AppState>>) -> Vec<ReceivedFile>
     let mut files = state.received_files.write().unwrap();
     files.clear();
     Vec::new()
+}
+
+#[tauri::command]
+fn respond_transfer_request(
+    state: tauri::State<Arc<AppState>>,
+    request_id: String,
+    accept: bool,
+) -> Result<(), String> {
+    state.respond_transfer(&request_id, accept)
 }
 
 #[tauri::command]
@@ -606,6 +774,7 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 let app_routes = Router::new()
                     .route("/", get(handle_web_root))
+                    .route("/request-send", post(handle_request_send))
                     .route(
                         "/upload",
                         post(handle_upload).layer(DefaultBodyLimit::disable()),
@@ -659,6 +828,7 @@ pub fn run() {
             get_received_files,
             delete_received_file,
             clear_received_files,
+            respond_transfer_request,
             open_save_directory,
             open_received_file,
             reveal_received_file,
@@ -722,6 +892,20 @@ mod tests {
         assert_eq!(t1.len(), 32);
         assert_eq!(t2.len(), 32);
         assert_ne!(t1, t2);
+    }
+
+    #[test]
+    fn test_transfer_approval_channel() {
+        let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
+        let mut pending = std::collections::HashMap::new();
+        let req_id = "test_req_123".to_string();
+        pending.insert(req_id.clone(), tx);
+
+        let sender = pending.remove(&req_id).unwrap();
+        sender.send(true).unwrap();
+
+        let approved = rx.blocking_recv().unwrap();
+        assert!(approved);
     }
 }
 

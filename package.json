@@ -6,7 +6,8 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
-    "build": "tauri build"
+    "build": "tauri build --config '{\"bundle\":{\"createUpdaterArtifacts\":false}}'",
+    "build:signed": "tauri build"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"

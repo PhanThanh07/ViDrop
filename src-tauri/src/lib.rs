@@ -72,7 +72,7 @@ pub struct AppState {
     pub created_at: RwLock<Instant>,
     pub port: u16,
     pub local_ip: String,
-    pub save_dir: PathBuf,
+    pub save_dir: RwLock<PathBuf>,
     pub received_files: RwLock<Vec<ReceivedFile>>,
     pub app_handle: AppHandle,
     pub pending_transfers: Mutex<HashMap<String, oneshot::Sender<bool>>>,
@@ -87,7 +87,7 @@ impl AppState {
             created_at: RwLock::new(Instant::now()),
             port,
             local_ip,
-            save_dir,
+            save_dir: RwLock::new(save_dir),
             received_files: RwLock::new(Vec::new()),
             app_handle,
             pending_transfers: Mutex::new(HashMap::new()),
@@ -106,6 +106,7 @@ impl AppState {
 
         let url = format!("http://{}:{}/?token={}", self.local_ip, self.port, token);
         let qr_svg = generate_qr_svg(&url)?;
+        let save_dir = self.save_dir.read().unwrap().to_string_lossy().to_string();
 
         Ok(ServerInfo {
             local_ip: self.local_ip.clone(),
@@ -115,7 +116,7 @@ impl AppState {
             qr_svg,
             expires_in_seconds: SESSION_DURATION_SECS,
             remaining_seconds,
-            save_dir: self.save_dir.to_string_lossy().to_string(),
+            save_dir,
         })
     }
 
@@ -130,6 +131,7 @@ impl AppState {
 
         let url = format!("http://{}:{}/?token={}", self.local_ip, self.port, new_token);
         let qr_svg = generate_qr_svg(&url)?;
+        let save_dir = self.save_dir.read().unwrap().to_string_lossy().to_string();
 
         let info = ServerInfo {
             local_ip: self.local_ip.clone(),
@@ -139,7 +141,7 @@ impl AppState {
             qr_svg,
             expires_in_seconds: SESSION_DURATION_SECS,
             remaining_seconds: SESSION_DURATION_SECS,
-            save_dir: self.save_dir.to_string_lossy().to_string(),
+            save_dir,
         };
 
         // Emit update event to frontend
@@ -419,7 +421,7 @@ async fn handle_upload(
             .to_string();
 
         let final_filename = sanitize_filename(&raw_filename);
-        let destination_path = state.save_dir.join(&final_filename);
+        let destination_path = state.save_dir.read().unwrap().join(&final_filename);
 
         use tokio::io::AsyncWriteExt;
         let mut out_file = tokio::fs::File::create(&destination_path).await.map_err(|e| {
@@ -518,8 +520,61 @@ fn respond_transfer_request(
 
 #[tauri::command]
 fn open_save_directory(state: tauri::State<Arc<AppState>>) -> Result<(), String> {
-    let path = state.save_dir.to_string_lossy().to_string();
+    let path = state.save_dir.read().unwrap().to_string_lossy().to_string();
     open_dir_native(&path)
+}
+
+#[tauri::command]
+async fn select_save_directory(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let default_path = state.save_dir.read().unwrap().clone();
+    let folder = app
+        .dialog()
+        .file()
+        .set_directory(&default_path)
+        .set_title("Chọn thư mục lưu file nhận từ Vi Drop")
+        .blocking_pick_folder();
+
+    if let Some(folder_path) = folder {
+        let path = folder_path.as_path().ok_or("Đường dẫn không hợp lệ")?;
+        let path_buf = path.to_path_buf();
+        let path_str = path_buf.to_string_lossy().to_string();
+
+        {
+            let mut save_lock = state.save_dir.write().unwrap();
+            *save_lock = path_buf;
+        }
+
+        let _ = app.emit("save-directory-changed", serde_json::json!({ "path": &path_str }));
+
+        Ok(Some(path_str))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+fn set_save_directory(
+    app: tauri::AppHandle,
+    state: tauri::State<Arc<AppState>>,
+    path: String,
+) -> Result<String, String> {
+    let path_buf = PathBuf::from(&path);
+    if !path_buf.exists() {
+        std::fs::create_dir_all(&path_buf).map_err(|e| format!("Không thể tạo thư mục: {}", e))?;
+    }
+    let canonical = path_buf.canonicalize().unwrap_or(path_buf);
+    let path_str = canonical.to_string_lossy().to_string();
+    {
+        let mut save_lock = state.save_dir.write().unwrap();
+        *save_lock = canonical;
+    }
+    let _ = app.emit("save-directory-changed", serde_json::json!({ "path": &path_str }));
+    Ok(path_str)
 }
 
 fn find_received_path(state: &AppState, id: &str) -> Result<PathBuf, String> {
@@ -716,6 +771,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Check for updates in background after 3 seconds
             let handle_for_bg_update = app.handle().clone();
@@ -830,6 +886,8 @@ pub fn run() {
             clear_received_files,
             respond_transfer_request,
             open_save_directory,
+            select_save_directory,
+            set_save_directory,
             open_received_file,
             reveal_received_file,
             check_update,
@@ -906,6 +964,17 @@ mod tests {
 
         let approved = rx.blocking_recv().unwrap();
         assert!(approved);
+    }
+
+    #[test]
+    fn test_save_dir_rwlock() {
+        let initial = PathBuf::from("/tmp/vidrop_initial");
+        let dir_lock = RwLock::new(initial);
+        assert_eq!(*dir_lock.read().unwrap(), PathBuf::from("/tmp/vidrop_initial"));
+
+        let new_dir = PathBuf::from("/tmp/vidrop_custom");
+        *dir_lock.write().unwrap() = new_dir.clone();
+        assert_eq!(*dir_lock.read().unwrap(), new_dir);
     }
 }
 

@@ -9,6 +9,7 @@
     "core:default",
     "core:event:default",
     "updater:default",
-    "process:default"
+    "process:default",
+    "dialog:default"
   ]
 }

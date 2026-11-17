@@ -436,6 +436,24 @@ async function handleCopyLink() {
   }
 }
 
+async function handleChangeDirectory() {
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+
+  try {
+    const selected = await invoke('select_save_directory');
+    if (selected) {
+      dirPath.textContent = selected;
+      dirPath.title = selected;
+      localStorage.setItem('vidrop-save-dir', selected);
+      showToast('📁 Đã đổi thư mục lưu thành công!');
+    }
+  } catch (err) {
+    console.error('Change directory error:', err);
+    showToast(`❌ Không thể đổi thư mục: ${err}`);
+  }
+}
+
 async function handleOpenDirectory() {
   const invoke = getTauriInvoke();
   if (!invoke) return;
@@ -555,6 +573,20 @@ async function initTauri() {
     const info = await invoke('get_server_info');
     updateServerInfoUI(info);
 
+    // 1.1 Restore custom save directory if previously set
+    const savedDir = localStorage.getItem('vidrop-save-dir');
+    if (savedDir) {
+      try {
+        const actualDir = await invoke('set_save_directory', { path: savedDir });
+        if (actualDir) {
+          dirPath.textContent = actualDir;
+          dirPath.title = actualDir;
+        }
+      } catch (e) {
+        console.warn('Failed to restore custom save directory:', e);
+      }
+    }
+
     // 2. Fetch existing files
     const files = await invoke('get_received_files');
     receivedFiles = files || [];
@@ -571,6 +603,14 @@ async function initTauri() {
       await listen('token-refreshed', (event) => {
         if (event && event.payload) {
           updateServerInfoUI(event.payload);
+        }
+      });
+
+      // Lắng nghe thay đổi thư mục lưu file
+      await listen('save-directory-changed', (event) => {
+        if (event && event.payload && event.payload.path) {
+          dirPath.textContent = event.payload.path;
+          dirPath.title = event.payload.path;
         }
       });
 

@@ -237,8 +237,13 @@ function renderFilesList() {
         </div>
       </div>
       <div class="file-row-actions">
-        <button class="btn btn-outline btn-sm" onclick="handleOpenFileById('${file.id}')" title="Định vị file">
+        <button class="btn btn-outline btn-sm" onclick="handleOpenFileById('${file.id}')" title="Mở file bằng ứng dụng mặc định">
           <span>Xem file</span>
+        </button>
+        <button class="btn-icon-plain" onclick="handleRevealFileById('${file.id}')" title="Hiện trong thư mục">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+          </svg>
         </button>
         <button class="btn-icon-danger" onclick="handleDeleteFile('${file.id}')" title="Xóa khỏi danh sách">
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -297,12 +302,25 @@ async function handleClearAll() {
   });
 }
 
-function handleOpenFileById(id) {
-  const file = receivedFiles.find((f) => f.id === id);
-  if (file && file.path) {
-    handleOpenFile(file.path);
-  } else {
-    showToast('❌ Không tìm thấy đường dẫn file');
+async function handleOpenFileById(id) {
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+  try {
+    await invoke('open_received_file', { id });
+  } catch (err) {
+    console.error('Open file error:', err);
+    showToast(`❌ ${err || 'Không thể mở file'}`);
+  }
+}
+
+async function handleRevealFileById(id) {
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+  try {
+    await invoke('reveal_received_file', { id });
+  } catch (err) {
+    console.error('Reveal file error:', err);
+    showToast(`❌ ${err || 'Không thể mở thư mục chứa file'}`);
   }
 }
 
@@ -340,17 +358,6 @@ async function handleOpenDirectory() {
   } catch (err) {
     console.error('Open directory error:', err);
     showToast('❌ Không thể mở thư mục');
-  }
-}
-
-async function handleOpenFile(path) {
-  const invoke = getTauriInvoke();
-  if (!invoke) return;
-  try {
-    await invoke('open_file', { path });
-  } catch (err) {
-    console.error('Open file error:', err);
-    showToast('❌ Không thể mở file');
   }
 }
 

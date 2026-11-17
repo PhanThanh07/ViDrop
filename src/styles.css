@@ -458,6 +458,24 @@ body {
   border-color: #ef4444;
 }
 
+.btn-icon-plain {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.btn-icon-plain:hover {
+  color: var(--primary);
+  background: rgba(2, 132, 199, 0.1);
+  border-color: rgba(2, 132, 199, 0.25);
+}
+
 .btn-icon-danger {
   background: transparent;
   color: var(--text-muted);

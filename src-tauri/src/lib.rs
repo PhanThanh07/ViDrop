@@ -353,9 +353,31 @@ fn open_save_directory(state: tauri::State<Arc<AppState>>) -> Result<(), String>
     open_dir_native(&path)
 }
 
+fn find_received_path(state: &AppState, id: &str) -> Result<PathBuf, String> {
+    let files = state.received_files.read().unwrap();
+    let file = files
+        .iter()
+        .find(|f| f.id == id)
+        .ok_or_else(|| "Không tìm thấy file trong danh sách".to_string())?;
+    let path = PathBuf::from(&file.path);
+    if !path.exists() {
+        return Err("File không còn tồn tại trên ổ đĩa (có thể đã bị xóa hoặc di chuyển)".to_string());
+    }
+    Ok(path)
+}
+
+/// Mở file bằng ứng dụng mặc định của hệ điều hành (ảnh -> trình xem ảnh, pdf -> trình đọc pdf...)
 #[tauri::command]
-fn open_file(path: String) -> Result<(), String> {
-    open_file_native(&path)
+fn open_received_file(id: String, state: tauri::State<Arc<AppState>>) -> Result<(), String> {
+    let path = find_received_path(&state, &id)?;
+    open_with_default_app(&path)
+}
+
+/// Mở thư mục chứa file và bôi đen (chọn) file đó
+#[tauri::command]
+fn reveal_received_file(id: String, state: tauri::State<Arc<AppState>>) -> Result<(), String> {
+    let path = find_received_path(&state, &id)?;
+    reveal_in_folder(&path)
 }
 
 fn open_dir_native(path: &str) -> Result<(), String> {
@@ -384,7 +406,35 @@ fn open_dir_native(path: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn open_file_native(path: &str) -> Result<(), String> {
+fn open_with_default_app(path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| format!("Lỗi mở file: {}", e))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // explorer.exe <đường_dẫn_file> mở file bằng ứng dụng mặc định (giống double-click).
+        // Đường dẫn được truyền như MỘT đối số riêng nên Rust tự bọc ngoặc kép đúng chuẩn
+        // khi có dấu cách / ký tự Unicode.
+        std::process::Command::new("explorer.exe")
+            .arg(path.as_os_str())
+            .spawn()
+            .map_err(|e| format!("Lỗi mở file: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| format!("Lỗi mở file: {}", e))?;
+    }
+    Ok(())
+}
+
+fn reveal_in_folder(path: &Path) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
@@ -395,28 +445,25 @@ fn open_file_native(path: &str) -> Result<(), String> {
     }
     #[cfg(target_os = "windows")]
     {
-        use std::path::Path;
-        let p = Path::new(path);
-        let win_path = path.replace('/', "\\");
-        if p.exists() {
-            std::process::Command::new("explorer")
-                .arg(format!("/select,{}", win_path))
-                .spawn()
-                .map_err(|e| format!("Lỗi định vị file: {}", e))?;
-        } else if let Some(parent) = p.parent() {
-            let win_parent = parent.to_string_lossy().replace('/', "\\");
-            std::process::Command::new("explorer")
-                .arg(&win_parent)
-                .spawn()
-                .map_err(|e| format!("Lỗi mở thư mục: {}", e))?;
-        }
+        // Explorer yêu cầu đúng cú pháp: /select,"C:\đường dẫn\tên file.ext"
+        // Không được dùng .arg() vì Rust sẽ bọc cả chuỗi "/select,..." trong ngoặc kép
+        // khi đường dẫn có dấu cách -> Explorer không hiểu và mở thư mục mặc định.
+        // raw_arg truyền nguyên văn chuỗi. Tên file Windows không thể chứa ký tự `"`.
+        use std::os::windows::process::CommandExt;
+        let win_path = path.to_string_lossy().replace('/', "\\");
+        std::process::Command::new("explorer.exe")
+            .raw_arg(format!("/select,\"{}\"", win_path))
+            .spawn()
+            .map_err(|e| format!("Lỗi định vị file: {}", e))?;
     }
     #[cfg(target_os = "linux")]
     {
-        std::process::Command::new("xdg-open")
-            .arg(path)
-            .spawn()
-            .map_err(|e| format!("Lỗi định vị file: {}", e))?;
+        if let Some(parent) = path.parent() {
+            std::process::Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| format!("Lỗi định vị file: {}", e))?;
+        }
     }
     Ok(())
 }
@@ -488,7 +535,8 @@ pub fn run() {
             delete_received_file,
             clear_received_files,
             open_save_directory,
-            open_file
+            open_received_file,
+            reveal_received_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

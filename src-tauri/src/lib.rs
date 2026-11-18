@@ -1096,6 +1096,7 @@ fn reveal_in_folder(path: &Path) -> Result<(), String> {
     }
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         let win_path = path.to_string_lossy().replace('/', "\\");
         std::process::Command::new("explorer.exe")
             .raw_arg(format!("/select,\"{}\"", win_path))

@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="vi" data-theme="light">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vi Drop - Nhận File An Toàn Qua Wi-Fi</title>
+  <title>Vi Drop - Truyền & Nhận File An Toàn Qua Wi-Fi</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
   <div class="app-layout">
     <!-- Top Bar -->
@@ -14,12 +16,23 @@
         <div class="brand-badge">⚡</div>
         <div>
           <h1 class="brand-title">Vi Drop</h1>
-          <p class="brand-tagline">Truyền file nội bộ P2P qua Wi-Fi • Mã hóa & Tốc độ cao</p>
+          <p class="brand-tagline">Truyền file nội bộ P2P</p>
         </div>
       </div>
       <div class="header-right">
+        <!-- 1-to-1 Peer Connection Status Pill -->
+        <div class="peer-status-pill" id="peerStatusPill" title="Trạng thái kết nối thiết bị">
+          <span class="peer-status-dot" id="peerStatusDot"></span>
+          <span class="peer-status-text" id="peerStatusText">Sẵn sàng (Chưa có thiết bị)</span>
+          <button class="btn-danger-pill" id="btnDisconnectPeer" onclick="handleDisconnectActivePeer()"
+            style="display: none;" title="Ngắt kết nối thiết bị này để người khác kết nối">
+            Ngắt kết nối
+          </button>
+        </div>
+
         <!-- Check Update Button -->
-        <button class="theme-toggle-btn" id="btnCheckUpdate" onclick="handleManualCheckUpdate()" title="Kiểm tra bản cập nhật mới">
+        <button class="theme-toggle-btn" id="btnCheckUpdate" onclick="handleManualCheckUpdate()"
+          title="Kiểm tra bản cập nhật mới">
           <span class="theme-icon">🔄</span>
           <span class="theme-text" id="updateBtnText">Cập nhật</span>
         </button>
@@ -61,43 +74,35 @@
         <div class="panel-card qr-card">
           <div class="card-header">
             <h2 class="card-title">Mã QR Kết Nối</h2>
-            <span class="badge" id="qrStatusBadge">Đang hiệu lực</span>
+            <span class="badge" id="qrStatusBadge">Sẵn sàng</span>
           </div>
-          <p class="card-desc">Dùng camera iPhone hoặc Android để quét mã và gửi file</p>
+          <p class="card-desc">Quét mã bằng Camera điện thoại để yêu cầu kết nối</p>
 
           <div class="qr-wrapper">
             <div class="qr-container" id="qrContainer">
               <div class="qr-placeholder">Đang tạo mã QR...</div>
             </div>
-            <div class="qr-overlay" id="qrOverlay">
-              <div class="expired-icon">⏳</div>
-              <div class="expired-title">Mã QR đã hết hạn</div>
-              <div class="expired-desc">Quá hạn 5 phút bảo mật</div>
-              <button class="btn btn-secondary btn-sm" onclick="handleRefreshToken()">Tạo mã mới</button>
-            </div>
           </div>
 
-          <!-- Compact Timer & Icon Action Buttons -->
+          <!-- QR Status & Icon Action Buttons -->
           <div class="qr-toolbar">
-            <div class="timer-compact" title="Mã QR tự động làm mới sau mỗi 5 phút">
-              <svg class="timer-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div class="timer-bar-bg">
-                <div class="timer-bar-fill" id="timerBar"></div>
-              </div>
-              <span class="timer-countdown" id="timerCountdown">05:00</span>
+            <div class="qr-status-pill" title="Mã QR hoạt động liên tục">
+              <span class="qr-status-indicator"></span>
+              <span class="qr-status-text" id="qrStatusText">Mã QR luôn sẵn sàng</span>
             </div>
 
             <div class="qr-icon-actions">
-              <button class="icon-btn icon-btn-primary" id="btnRefresh" onclick="handleRefreshToken()" title="Tạo mã QR mới">
+              <button class="icon-btn icon-btn-primary" id="btnRefresh" onclick="handleRefreshToken()"
+                title="Tạo mã QR mới">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
-              <button class="icon-btn" id="btnCopyLink" onclick="handleCopyLink()" title="Sao chép link web gửi file">
+              <button class="icon-btn" id="btnCopyLink" onclick="handleCopyLink()" title="Sao chép link web kết nối">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               </button>
             </div>
@@ -109,20 +114,24 @@
           <div class="dir-header">
             <div class="dir-icon">📁</div>
             <div class="dir-details">
-              <span class="dir-label">Thư mục lưu file:</span>
+              <span class="dir-label">Thư mục lưu file nhận:</span>
               <span class="dir-path" id="dirPath" title="Downloads/ViDrop">~/Downloads/ViDrop</span>
             </div>
           </div>
           <div class="dir-actions-grid">
-            <button class="btn btn-outline btn-sm" id="btnChangeDir" onclick="handleChangeDirectory()" title="Chọn thư mục lưu file khác">
+            <button class="btn btn-outline btn-sm" id="btnChangeDir" onclick="handleChangeDirectory()"
+              title="Chọn thư mục lưu file khác">
               <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
               <span>Đổi thư mục</span>
             </button>
-            <button class="btn btn-secondary btn-sm" id="btnOpenDir" onclick="handleOpenDirectory()" title="Mở thư mục lưu trong File Manager">
+            <button class="btn btn-secondary btn-sm" id="btnOpenDir" onclick="handleOpenDirectory()"
+              title="Mở thư mục lưu trong File Manager">
               <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
               </svg>
               <span>Mở thư mục</span>
             </button>
@@ -130,21 +139,57 @@
         </div>
       </section>
 
-      <!-- Right Column: Real-time Received Files List -->
+      <!-- Right Column: Bidirectional Sharing -->
       <section class="right-panel">
+        <!-- Top Half: Share PC Files to Mobile (PC -> Mobile) -->
+        <div class="panel-card share-card">
+          <div class="files-header">
+            <div class="files-title-box">
+              <span class="panel-section-icon">📤</span>
+              <h2 class="card-title">Gửi file sang điện thoại</h2>
+              <span class="count-badge" id="sharedCountBadge">0 file</span>
+            </div>
+            <div class="files-actions-box">
+              <button class="btn btn-primary btn-sm" id="btnSelectShareFiles" onclick="handleSelectShareFiles()"
+                title="Cần kết nối điện thoại trước khi gửi file" disabled>
+                <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Chọn file gửi</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Staged / Shared Files Container -->
+          <div class="share-dropzone" id="shareDropzone">
+            <div class="empty-share-state" id="emptyShareState">
+              <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">📲</div>
+              <div style="font-size: 0.85rem; font-weight: 600;">Kéo & thả file vào đây hoặc bấm "Chọn file gửi"</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
+                Điện thoại đã kết nối có thể bấm "Tải về" ngay lập tức qua Wi-Fi
+              </div>
+            </div>
+            <div class="shared-files-list" id="sharedFilesList" style="display: none;"></div>
+          </div>
+        </div>
+
+        <!-- Bottom Half: Received Files From Mobile (Mobile -> PC) -->
         <div class="panel-card files-card">
           <div class="files-header">
             <div class="files-title-box">
-              <h2 class="card-title">File đã nhận trong phiên</h2>
+              <span class="panel-section-icon">📥</span>
+              <h2 class="card-title">File đã nhận từ điện thoại</h2>
               <span class="count-badge" id="filesCountBadge">0 file</span>
             </div>
             <div class="files-actions-box">
               <span class="total-size" id="totalSizeText">Tổng: 0 MB</span>
-              <button class="btn btn-danger-outline btn-xs" id="btnClearAll" onclick="handleClearAll()" style="display:none;" title="Xóa tất cả khỏi danh sách">
+              <button class="btn btn-danger-outline btn-xs" id="btnClearAll" onclick="handleClearAll()"
+                style="display:none;" title="Xóa tất cả khỏi danh sách hiển thị">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                <span>Xóa tất cả</span>
+                <span>Xóa danh sách</span>
               </button>
             </div>
           </div>
@@ -154,22 +199,9 @@
             <div class="empty-art">📲</div>
             <h3 class="empty-title">Sẵn sàng nhận file từ điện thoại</h3>
             <p class="empty-desc">
-              Quét mã QR bên cạnh bằng điện thoại của bạn (iOS hoặc Android) để bắt đầu gửi ảnh, video hoặc tài liệu không giới hạn dung lượng.
+              Khi điện thoại kết nối thành công, mọi file gửi sang sẽ được nhận tốc độ cao và lưu tự động vào thư mục
+              theo ngày.
             </p>
-            <div class="empty-steps">
-              <div class="step-item">
-                <span class="step-num">1</span>
-                <span>Kết nối cùng Wi-Fi</span>
-              </div>
-              <div class="step-item">
-                <span class="step-num">2</span>
-                <span>Quét mã QR bằng Camera</span>
-              </div>
-              <div class="step-item">
-                <span class="step-num">3</span>
-                <span>Chọn file và nhấn Gửi</span>
-              </div>
-            </div>
           </div>
 
           <!-- Files List Container -->
@@ -186,50 +218,43 @@
         <p class="modal-desc" id="modalDesc">Bạn có chắc chắn muốn thực hiện hành động này?</p>
         <div class="modal-actions">
           <button class="btn btn-outline" onclick="closeConfirmModal()">Hủy</button>
-          <button class="btn btn-danger" id="modalBtnConfirm">Xác nhận xóa</button>
+          <button class="btn btn-danger" id="modalBtnConfirm">Xác nhận</button>
         </div>
       </div>
     </div>
 
-    <!-- Transfer Request Confirmation Modal -->
-    <div class="modal-backdrop" id="transferConfirmModal">
-      <div class="modal-card transfer-modal-card">
-        <div class="transfer-modal-header">
-          <div class="transfer-modal-icon">📲</div>
-          <div class="transfer-modal-titles">
-            <h3 class="modal-title">Yêu cầu nhận file</h3>
-            <p class="transfer-device-badge" id="transferDeviceName">Thiết bị di động</p>
+    <!-- Pair Request Confirmation Modal -->
+    <div class="modal-backdrop" id="pairConfirmModal">
+      <div class="modal-card pair-modal-card">
+        <div class="pair-modal-header">
+          <div class="pair-modal-icon">📱</div>
+          <div class="pair-modal-titles">
+            <h3 class="modal-title">Yêu cầu kết nối thiết bị</h3>
+            <p class="pair-device-badge" id="pairDeviceBadge">Thiết bị di động</p>
           </div>
         </div>
 
-        <div class="transfer-summary-box">
-          <div class="transfer-stat">
-            <span class="stat-label">Số lượng file</span>
-            <strong class="stat-value" id="transferFileCount">0 file</strong>
-          </div>
-          <div class="transfer-stat-divider"></div>
-          <div class="transfer-stat">
-            <span class="stat-label">Tổng dung lượng</span>
-            <strong class="stat-value" id="transferTotalSize">0 MB</strong>
-          </div>
+        <div class="pair-user-box">
+          <span class="pair-user-label">Tên người dùng:</span>
+          <strong class="pair-user-name" id="pairClientName">...</strong>
         </div>
 
-        <div class="transfer-files-preview" id="transferFilesPreview"></div>
-
-        <p class="transfer-confirm-msg">Bạn có đồng ý nhận các file này và lưu vào máy không?</p>
+        <p class="pair-confirm-msg">
+          Người dùng này muốn kết nối với máy tính để truyền nhận file 2 chiều. Bạn có đồng ý kết nối không?
+        </p>
 
         <div class="modal-actions">
-          <button class="btn btn-outline" id="btnRejectTransfer" onclick="handleTransferResponse(false)">
+          <button class="btn btn-outline" id="btnRejectPair" onclick="handlePairResponse(false)">
             <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
             <span>Từ chối</span>
           </button>
-          <button class="btn btn-primary" id="btnAcceptTransfer" onclick="handleTransferResponse(true)">
+          <button class="btn btn-primary" id="btnAcceptPair" onclick="handlePairResponse(true)">
             <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
-            <span>Đồng ý nhận</span>
+            <span>Đồng ý kết nối</span>
           </button>
         </div>
       </div>
@@ -241,7 +266,7 @@
         <div class="modal-icon">🚀</div>
         <h3 class="modal-title" id="updateProgressTitle">Đang cập nhật Vi Drop...</h3>
         <p class="modal-desc" id="updateProgressDesc">Đang tải xuống phiên bản mới từ GitHub...</p>
-        
+
         <div class="progress-bar-container">
           <div class="progress-bar-fill" id="updateProgressBar" style="width: 0%;"></div>
         </div>
@@ -260,4 +285,5 @@
 
   <script src="main.js"></script>
 </body>
+
 </html>

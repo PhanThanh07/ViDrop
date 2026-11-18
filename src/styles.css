@@ -136,6 +136,58 @@ body {
   gap: 0.85rem;
 }
 
+/* 1-to-1 Peer Status Pill */
+.peer-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-card-sub);
+  border: 1px solid var(--border-color);
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.peer-status-pill.connected {
+  background: var(--badge-live-bg);
+  border-color: var(--badge-live-border);
+  color: var(--badge-live-text);
+}
+
+.peer-status-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--text-dim);
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.peer-status-pill.connected .peer-status-dot {
+  background-color: var(--success);
+  box-shadow: 0 0 8px var(--success);
+  animation: pulse-dot 1.8s infinite;
+}
+
+.btn-danger-pill {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-danger-pill:hover {
+  background: #ef4444;
+  color: white;
+}
+
 /* Theme Toggle Button */
 .theme-toggle-btn {
   display: inline-flex;
@@ -333,7 +385,7 @@ body {
   margin-top: 0.15rem;
 }
 
-.timer-compact {
+.qr-status-pill {
   flex: 1;
   display: flex;
   align-items: center;
@@ -345,6 +397,25 @@ body {
   min-width: 0;
   height: 38px;
   box-sizing: border-box;
+}
+
+.qr-status-indicator {
+  width: 8px;
+  height: 8px;
+  background-color: var(--success);
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px var(--success);
+  animation: pulse-dot 2s infinite;
+}
+
+.qr-status-text {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .timer-icon {
@@ -474,6 +545,13 @@ body {
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .btn-icon {
@@ -621,13 +699,95 @@ body {
   gap: 0.5rem;
 }
 
-/* Right Panel: Received Files */
+/* Right Panel: Bidirectional Transfer */
 .right-panel {
   display: flex;
   flex-direction: column;
+  gap: 1rem;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+}
+
+.panel-section-icon {
+  font-size: 1.15rem;
+}
+
+.share-card {
+  flex: 0 0 auto;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.share-dropzone {
+  margin-top: 0.65rem;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-card-sub);
+  padding: 0.65rem;
+  min-height: 80px;
+  max-height: 140px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease;
+}
+
+.share-dropzone.dragover {
+  border-color: var(--primary);
+  background: var(--primary-glow);
+}
+
+.empty-share-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 100%;
+  padding: 0.35rem;
+}
+
+.shared-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.shared-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.shared-file-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  flex: 1;
+}
+
+.shared-file-name {
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.shared-file-size {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .files-card {
@@ -1048,6 +1208,71 @@ body {
 
 .transfer-confirm-msg {
   font-size: 0.84rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 1.25rem;
+  line-height: 1.4;
+}
+
+/* Pair Confirmation Modal */
+.pair-modal-card {
+  max-width: 440px;
+  text-align: left;
+  padding: 1.5rem;
+}
+
+.pair-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.pair-modal-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.pair-modal-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pair-device-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-glow);
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  align-self: flex-start;
+}
+
+.pair-user-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-card-sub);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.9rem;
+}
+
+.pair-user-label {
+  color: var(--text-muted);
+}
+
+.pair-user-name {
+  color: var(--primary);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.pair-confirm-msg {
+  font-size: 0.85rem;
   color: var(--text-muted);
   text-align: center;
   margin-bottom: 1.25rem;

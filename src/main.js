@@ -1,8 +1,7 @@
 let serverInfo = null;
-let remainingSeconds = 300;
-let totalSeconds = 300;
-let timerInterval = null;
 let receivedFiles = [];
+let sharedFiles = [];
+let activePeer = null;
 
 // Fallback Tauri API helpers
 const getTauriInvoke = () => {
@@ -37,6 +36,18 @@ const themeToggleBtn = document.getElementById('themeToggleBtn');
 const themeIcon = document.getElementById('themeIcon');
 const themeText = document.getElementById('themeText');
 
+// Peer Status UI Elements
+const peerStatusPill = document.getElementById('peerStatusPill');
+const peerStatusDot = document.getElementById('peerStatusDot');
+const peerStatusText = document.getElementById('peerStatusText');
+const btnDisconnectPeer = document.getElementById('btnDisconnectPeer');
+
+// PC to Mobile Sharing UI Elements
+const sharedCountBadge = document.getElementById('sharedCountBadge');
+const shareDropzone = document.getElementById('shareDropzone');
+const emptyShareState = document.getElementById('emptyShareState');
+const sharedFilesList = document.getElementById('sharedFilesList');
+
 // Update UI Elements
 const btnCheckUpdate = document.getElementById('btnCheckUpdate');
 const updateBtnText = document.getElementById('updateBtnText');
@@ -51,61 +62,98 @@ const updateStatusMsg = document.getElementById('updateStatusMsg');
 let currentUpdateInfo = null;
 let isUpdating = false;
 
-// Modal Elements
+// Confirmation Modal Elements
 const confirmModal = document.getElementById('confirmModal');
 const modalTitle = document.getElementById('modalTitle');
 const modalDesc = document.getElementById('modalDesc');
 const modalBtnConfirm = document.getElementById('modalBtnConfirm');
 let onModalConfirmCallback = null;
 
-// Transfer Request Modal Elements
-const transferConfirmModal = document.getElementById('transferConfirmModal');
-const transferDeviceName = document.getElementById('transferDeviceName');
-const transferFileCount = document.getElementById('transferFileCount');
-const transferTotalSize = document.getElementById('transferTotalSize');
-const transferFilesPreview = document.getElementById('transferFilesPreview');
-let activeTransferRequestId = null;
+// Pairing Request Modal Elements
+const pairConfirmModal = document.getElementById('pairConfirmModal');
+const pairDeviceBadge = document.getElementById('pairDeviceBadge');
+const pairClientName = document.getElementById('pairClientName');
+let activePairRequestId = null;
 
-function showTransferConfirm(data) {
+function showPairConfirm(data) {
   if (!data || !data.request_id) return;
-  activeTransferRequestId = data.request_id;
-  transferDeviceName.textContent = data.device_name || 'Thiết bị di động';
-  transferFileCount.textContent = `${data.files.length} file`;
-  transferTotalSize.textContent = data.total_size_formatted || formatBytes(data.total_size);
-
-  if (Array.isArray(data.files)) {
-    transferFilesPreview.innerHTML = data.files.map(f => `
-      <div class="transfer-file-item">
-        <span class="transfer-file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
-        <span class="transfer-file-size">${formatBytes(f.size)}</span>
-      </div>
-    `).join('');
-  } else {
-    transferFilesPreview.innerHTML = '';
-  }
-
-  transferConfirmModal.classList.add('show');
+  activePairRequestId = data.request_id;
+  pairClientName.textContent = data.client_name || 'Người dùng';
+  pairDeviceBadge.textContent = data.device_info || 'Thiết bị di động';
+  pairConfirmModal.classList.add('show');
 }
 
-async function handleTransferResponse(accept) {
-  if (!activeTransferRequestId) return;
-  const requestId = activeTransferRequestId;
-  activeTransferRequestId = null;
-  transferConfirmModal.classList.remove('show');
+async function handlePairResponse(accept) {
+  if (!activePairRequestId) return;
+  const requestId = activePairRequestId;
+  activePairRequestId = null;
+  pairConfirmModal.classList.remove('show');
 
   const invoke = getTauriInvoke();
   if (invoke) {
     try {
-      await invoke('respond_transfer_request', { requestId, accept });
+      await invoke('respond_pair_request', { requestId, accept });
       if (accept) {
-        showToast(' Đã đồng ý nhận. Đang chờ thiết bị tải file...');
+        showToast('🤝 Đã chấp nhận kết nối với thiết bị!');
       } else {
-        showToast('❌ Đã từ chối nhận file.');
+        showToast('❌ Đã từ chối yêu cầu kết nối.');
       }
     } catch (err) {
-      console.error('Respond transfer error:', err);
+      console.error('Respond pair request error:', err);
     }
   }
+}
+
+function updatePeerUI(peer) {
+  activePeer = peer;
+  const btnSelectShareFiles = document.getElementById('btnSelectShareFiles');
+
+  if (peer && peer.client_name) {
+    peerStatusPill.classList.add('connected');
+    peerStatusText.textContent = `🟢 ${peer.client_name} (${peer.device_info || 'Di động'})`;
+    btnDisconnectPeer.style.display = 'inline-block';
+    if (btnSelectShareFiles) {
+      btnSelectShareFiles.disabled = false;
+      btnSelectShareFiles.title = `Chọn file từ máy tính để gửi sang ${peer.client_name}`;
+    }
+    showToast(`📱 Thiết bị '${peer.client_name}' đã kết nối!`);
+  } else {
+    peerStatusPill.classList.remove('connected');
+    peerStatusText.textContent = 'Sẵn sàng (Chưa có thiết bị)';
+    btnDisconnectPeer.style.display = 'none';
+    if (btnSelectShareFiles) {
+      btnSelectShareFiles.disabled = true;
+      btnSelectShareFiles.title = 'Cần kết nối điện thoại trước khi gửi file';
+    }
+
+    // Khi ngắt kết nối: reset toàn bộ trạng thái hiện có trên giao diện
+    sharedFiles = [];
+    receivedFiles = [];
+    renderFilesList();
+  }
+  renderSharedFiles();
+}
+
+async function handleDisconnectActivePeer() {
+  if (!activePeer) return;
+  const name = activePeer.client_name || 'thiết bị';
+  showConfirmModal({
+    title: 'Ngắt kết nối thiết bị?',
+    desc: `Bạn có chắc muốn ngắt kết nối với '${name}'? Thiết bị sẽ bị ngắt và toàn bộ danh sách chia sẻ / nhận trong phiên này sẽ được làm sạch.`,
+    confirmText: 'Ngắt kết nối',
+    onConfirm: async () => {
+      const invoke = getTauriInvoke();
+      if (!invoke) return;
+      try {
+        await invoke('disconnect_peer');
+        updatePeerUI(null);
+        showToast(`🔌 Đã ngắt kết nối với '${name}' và làm sạch trạng thái`);
+      } catch (err) {
+        console.error('Disconnect error:', err);
+        showToast('❌ Không thể ngắt kết nối');
+      }
+    }
+  });
 }
 
 function showConfirmModal({ title, desc, confirmText, onConfirm }) {
@@ -136,6 +184,119 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// ----------------- PC to Mobile Shared Files -----------------
+function renderSharedFiles() {
+  if (!activePeer) {
+    emptyShareState.style.display = 'flex';
+    emptyShareState.innerHTML = `
+      <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">📱</div>
+      <div style="font-size: 0.85rem; font-weight: 600;">Chưa có thiết bị kết nối</div>
+      <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
+        Quét mã QR bằng điện thoại và kết nối để kích hoạt tính năng gửi file.
+      </div>
+    `;
+    sharedFilesList.style.display = 'none';
+    sharedCountBadge.textContent = '0 file';
+    return;
+  }
+
+  if (!Array.isArray(sharedFiles) || sharedFiles.length === 0) {
+    emptyShareState.style.display = 'flex';
+    emptyShareState.innerHTML = `
+      <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">📤</div>
+      <div style="font-size: 0.85rem; font-weight: 600;">Kéo & thả file vào đây hoặc bấm "Chọn file gửi"</div>
+      <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
+        File sẽ được gửi trực tiếp sang thiết bị: <strong>${escapeHtml(activePeer.client_name)}</strong>
+      </div>
+    `;
+    sharedFilesList.style.display = 'none';
+    sharedCountBadge.textContent = '0 file';
+    return;
+  }
+
+  emptyShareState.style.display = 'none';
+  sharedFilesList.style.display = 'flex';
+  sharedCountBadge.textContent = `${sharedFiles.length} file`;
+
+  sharedFilesList.innerHTML = sharedFiles.map((file) => {
+    const meta = getFileIconMeta(file.filename);
+    const safeFilename = escapeHtml(file.filename);
+    return `
+      <div class="shared-file-row">
+        <div class="shared-file-info">
+          <span style="font-size: 1.1rem;">${meta.icon}</span>
+          <span class="shared-file-name" title="${safeFilename}">${safeFilename}</span>
+          <span class="shared-file-size">• ${escapeHtml(file.size_formatted)}</span>
+        </div>
+        <button class="btn-icon-danger" onclick="handleRemoveSharedFile('${file.id}')" title="Xóa khỏi danh sách chia sẻ">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function handleSelectShareFiles() {
+  if (!activePeer) {
+    showToast('⚠️ Vui lòng kết nối với điện thoại trước khi gửi file');
+    return;
+  }
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+
+  try {
+    const updated = await invoke('select_and_share_files');
+    if (updated) {
+      sharedFiles = updated;
+      renderSharedFiles();
+      if (updated.length > 0) {
+        showToast(`📤 Đã gửi ${updated.length} file sang ${activePeer.client_name}`);
+      }
+    }
+  } catch (err) {
+    console.error('Select share files error:', err);
+    showToast(`❌ ${err}`);
+  }
+}
+
+async function handleRemoveSharedFile(id) {
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+
+  try {
+    const updated = await invoke('remove_shared_file', { id });
+    sharedFiles = updated || [];
+    renderSharedFiles();
+    showToast('🗑️ Đã xóa file khỏi danh sách chia sẻ');
+  } catch (err) {
+    console.error('Remove shared file error:', err);
+  }
+}
+
+// Drag & drop support for shareDropzone
+if (shareDropzone) {
+  ['dragenter', 'dragover'].forEach(name => {
+    shareDropzone.addEventListener(name, (e) => {
+      e.preventDefault();
+      if (activePeer) {
+        shareDropzone.classList.add('dragover');
+      }
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach(name => {
+    shareDropzone.addEventListener(name, (e) => {
+      e.preventDefault();
+      shareDropzone.classList.remove('dragover');
+      if (name === 'drop' && !activePeer) {
+        showToast('⚠️ Vui lòng kết nối với điện thoại trước khi gửi file');
+      }
+    }, false);
+  });
 }
 
 // ----------------- Theme Management -----------------
@@ -172,68 +333,8 @@ function showToast(message) {
   }, 2500);
 }
 
-function formatTime(secs) {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-}
-
-function updateTimerUI() {
-  if (remainingSeconds <= 0) {
-    timerCountdown.textContent = '00:00';
-    timerCountdown.className = 'timer-countdown expired';
-    timerBar.className = 'timer-bar-fill expired';
-    timerBar.style.width = '0%';
-    if (qrStatusBadge) {
-      qrStatusBadge.textContent = 'Đang làm mới...';
-      qrStatusBadge.className = 'badge expired';
-    }
-    return;
-  }
-
-  timerCountdown.textContent = formatTime(remainingSeconds);
-  const pct = Math.max(0, Math.min(100, (remainingSeconds / totalSeconds) * 100));
-  timerBar.style.width = `${pct}%`;
-
-  if (remainingSeconds <= 60) {
-    timerCountdown.className = 'timer-countdown warning';
-    timerBar.className = 'timer-bar-fill warning';
-    if (qrStatusBadge) {
-      qrStatusBadge.textContent = 'Sắp làm mới';
-      qrStatusBadge.className = 'badge expired';
-    }
-  } else {
-    timerCountdown.className = 'timer-countdown';
-    timerBar.className = 'timer-bar-fill';
-    if (qrStatusBadge) {
-      qrStatusBadge.textContent = 'Đang hiệu lực';
-      qrStatusBadge.className = 'badge';
-    }
-  }
-  if (qrOverlay) qrOverlay.classList.remove('visible');
-}
-
-function startCountdown() {
-  if (timerInterval) clearInterval(timerInterval);
-  updateTimerUI();
-  timerInterval = setInterval(() => {
-    if (remainingSeconds > 0) {
-      remainingSeconds--;
-      updateTimerUI();
-    } else {
-      clearInterval(timerInterval);
-      updateTimerUI();
-      // Tự động tạo lại mã QR khi hết hạn 5 phút
-      handleRefreshToken(true);
-    }
-  }, 1000);
-}
-
 function updateServerInfoUI(info) {
   serverInfo = info;
-  remainingSeconds = info.remaining_seconds;
-  totalSeconds = info.expires_in_seconds || 300;
-
   networkText.textContent = `Wi-Fi: ${info.local_ip}:${info.port}`;
   dirPath.textContent = info.save_dir;
   dirPath.title = info.save_dir;
@@ -242,11 +343,10 @@ function updateServerInfoUI(info) {
   if (info.qr_svg) {
     qrContainer.innerHTML = info.qr_svg;
   }
-
-  startCountdown();
 }
 
 function getFileIconMeta(filename) {
+  if (!filename) return { icon: '📁', className: 'file-icon-other' };
   const ext = (filename.split('.').pop() || '').toLowerCase();
   if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv'].includes(ext)) {
     return { icon: '🎬', className: 'file-icon-video' };
@@ -524,7 +624,6 @@ async function handleStartUpdate() {
   isUpdating = true;
   dismissUpdateBanner();
 
-  // Hiển thị modal tiến trình
   updateProgressModal.classList.add('show');
   updateProgressBar.style.width = '0%';
   updateProgressPercent.textContent = '0%';
@@ -533,7 +632,6 @@ async function handleStartUpdate() {
 
   try {
     await invoke('install_update');
-    // Khi hoàn tất thành công, backend sẽ gọi app.restart() để khởi động lại ứng dụng
   } catch (err) {
     console.error('Install update error:', err);
     isUpdating = false;
@@ -587,19 +685,38 @@ async function initTauri() {
       }
     }
 
-    // 2. Fetch existing files
+    // 2. Fetch active peer if any
+    try {
+      const currentPeer = await invoke('get_active_peer');
+      updatePeerUI(currentPeer);
+    } catch (e) {
+      console.warn('Failed to fetch active peer:', e);
+    }
+
+    // 3. Fetch shared files (PC -> Mobile)
+    try {
+      const pcFiles = await invoke('get_shared_files');
+      sharedFiles = pcFiles || [];
+      renderSharedFiles();
+    } catch (e) {
+      console.warn('Failed to fetch shared files:', e);
+    }
+
+    // 4. Fetch existing received files
     const files = await invoke('get_received_files');
     receivedFiles = files || [];
     renderFilesList();
 
-    // 3. Listen to real-time events
+    // 5. Listen to real-time events
     if (listen) {
+      // Nhận file mới từ điện thoại
       await listen('file-received', (event) => {
         if (event && event.payload) {
           addReceivedFile(event.payload);
         }
       });
 
+      // Token / QR được làm mới
       await listen('token-refreshed', (event) => {
         if (event && event.payload) {
           updateServerInfoUI(event.payload);
@@ -614,19 +731,40 @@ async function initTauri() {
         }
       });
 
-      // Lắng nghe sự kiện người gửi xin phép gửi file
-      await listen('transfer-request', (event) => {
+      // Lắng nghe yêu cầu kết nối từ điện thoại
+      await listen('pair-request', (event) => {
         if (event && event.payload) {
-          showTransferConfirm(event.payload);
+          showPairConfirm(event.payload);
         }
       });
 
-      // Lắng nghe sự kiện yêu cầu bị hủy hoặc hết hạn
-      await listen('transfer-request-cancelled', (event) => {
-        if (event && event.payload && event.payload.request_id === activeTransferRequestId) {
-          transferConfirmModal.classList.remove('show');
-          activeTransferRequestId = null;
-          showToast('⏳ Yêu cầu gửi file đã hết thời gian chờ.');
+      // Yêu cầu kết nối bị hủy / timeout
+      await listen('pair-request-cancelled', (event) => {
+        if (event && event.payload && event.payload.request_id === activePairRequestId) {
+          pairConfirmModal.classList.remove('show');
+          activePairRequestId = null;
+          showToast('⏳ Yêu cầu kết nối đã hết thời gian chờ.');
+        }
+      });
+
+      // Peer đã kết nối thành công
+      await listen('peer-connected', (event) => {
+        if (event && event.payload) {
+          updatePeerUI(event.payload);
+        }
+      });
+
+      // Peer đã ngắt kết nối
+      await listen('peer-disconnected', () => {
+        updatePeerUI(null);
+        showToast('🔌 Thiết bị đã ngắt kết nối');
+      });
+
+      // Cập nhật danh sách file PC chia sẻ
+      await listen('shared-files-updated', (event) => {
+        if (event && event.payload) {
+          sharedFiles = event.payload;
+          renderSharedFiles();
         }
       });
 

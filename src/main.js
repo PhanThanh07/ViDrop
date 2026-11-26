@@ -277,25 +277,96 @@ async function handleRemoveSharedFile(id) {
   }
 }
 
+let lastShareTime = 0;
+let lastSharedPathsSignature = '';
+
+async function handleSharePaths(paths) {
+  if (!Array.isArray(paths) || paths.length === 0) return;
+
+  if (!activePeer) {
+    showToast('⚠️ Vui lòng kết nối với điện thoại trước khi gửi file');
+    return;
+  }
+
+  const signature = paths.join('|');
+  const now = Date.now();
+  if (signature === lastSharedPathsSignature && now - lastShareTime < 1000) {
+    return;
+  }
+  lastShareTime = now;
+  lastSharedPathsSignature = signature;
+
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+
+  try {
+    const updated = await invoke('share_file_paths', { paths });
+    if (updated) {
+      sharedFiles = updated;
+      renderSharedFiles();
+      showToast(`📤 Đã thêm ${paths.length} file vào danh sách gửi sang ${activePeer.client_name}`);
+    }
+  } catch (err) {
+    console.error('Share file paths error:', err);
+    showToast(`❌ ${err}`);
+  }
+}
+
+// Ngăn trình duyệt mở file trực tiếp khi kéo thả vào cửa sổ ứng dụng
+window.addEventListener('dragover', (e) => {
+  e.preventDefault();
+}, false);
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+}, false);
+
 // Drag & drop support for shareDropzone
 if (shareDropzone) {
   ['dragenter', 'dragover'].forEach(name => {
     shareDropzone.addEventListener(name, (e) => {
       e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = activePeer ? 'copy' : 'none';
+      }
       if (activePeer) {
         shareDropzone.classList.add('dragover');
       }
     }, false);
   });
 
-  ['dragleave', 'drop'].forEach(name => {
+  ['dragleave'].forEach(name => {
     shareDropzone.addEventListener(name, (e) => {
       e.preventDefault();
       shareDropzone.classList.remove('dragover');
-      if (name === 'drop' && !activePeer) {
-        showToast('⚠️ Vui lòng kết nối với điện thoại trước khi gửi file');
-      }
     }, false);
+  });
+
+  shareDropzone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    shareDropzone.classList.remove('dragover');
+    if (!activePeer) {
+      showToast('⚠️ Vui lòng kết nối với điện thoại trước khi gửi file');
+      return;
+    }
+
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const paths = [];
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const f = e.dataTransfer.files[i];
+        if (f.path) {
+          paths.push(f.path);
+        }
+      }
+      if (paths.length > 0) {
+        await handleSharePaths(paths);
+      }
+    }
+  }, false);
+}
+
+if (emptyShareState) {
+  emptyShareState.addEventListener('click', () => {
+    handleSelectShareFiles();
   });
 }
 
@@ -790,6 +861,57 @@ async function initTauri() {
           }
         }
       });
+
+      // Lắng nghe sự kiện Kéo & Thả file từ OS (Tauri Native Drag & Drop)
+      try {
+        const currentWin = window.__TAURI__?.window?.getCurrentWindow?.()
+          || window.__TAURI__?.webviewWindow?.getCurrentWebviewWindow?.()
+          || window.__TAURI__?.webview?.getCurrentWebview?.();
+
+        if (currentWin && typeof currentWin.onDragDropEvent === 'function') {
+          await currentWin.onDragDropEvent((event) => {
+            const payload = event?.payload;
+            if (!payload) return;
+
+            if (payload.type === 'enter' || payload.type === 'over') {
+              if (activePeer && shareDropzone) {
+                shareDropzone.classList.add('dragover');
+              }
+            } else if (payload.type === 'leave') {
+              if (shareDropzone) {
+                shareDropzone.classList.remove('dragover');
+              }
+            } else if (payload.type === 'drop') {
+              if (shareDropzone) {
+                shareDropzone.classList.remove('dragover');
+              }
+              if (payload.paths && payload.paths.length > 0) {
+                handleSharePaths(payload.paths);
+              }
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('onDragDropEvent setup failed:', e);
+      }
+
+      // Fallback cho event tauri://drag-drop nếu onDragDropEvent không dùng được
+      try {
+        await listen('tauri://drag-enter', () => {
+          if (activePeer && shareDropzone) shareDropzone.classList.add('dragover');
+        });
+        await listen('tauri://drag-leave', () => {
+          if (shareDropzone) shareDropzone.classList.remove('dragover');
+        });
+        await listen('tauri://drag-drop', (event) => {
+          if (shareDropzone) shareDropzone.classList.remove('dragover');
+          if (event && event.payload && event.payload.paths && event.payload.paths.length > 0) {
+            handleSharePaths(event.payload.paths);
+          }
+        });
+      } catch (e) {
+        console.warn('Fallback drag listeners setup failed:', e);
+      }
     }
   } catch (err) {
     console.error('Init error:', err);

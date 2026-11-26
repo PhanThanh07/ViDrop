@@ -813,6 +813,23 @@ async fn select_and_share_files(
     }
 }
 
+fn collect_files_recursive(path: &Path, acc: &mut Vec<PathBuf>) {
+    if path.is_file() {
+        acc.push(path.to_path_buf());
+    } else if path.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(path) {
+            for entry in entries.flatten() {
+                let sub_path = entry.path();
+                if sub_path.is_file() {
+                    acc.push(sub_path);
+                } else if sub_path.is_dir() {
+                    collect_files_recursive(&sub_path, acc);
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 fn share_file_paths(
     paths: Vec<String>,
@@ -824,27 +841,30 @@ fn share_file_paths(
         return Err("Chưa có điện thoại nào kết nối. Vui lòng kết nối thiết bị trước khi gửi file.".to_string());
     }
 
-    let mut new_shared = Vec::new();
+    let mut all_files = Vec::new();
     for p in paths {
         let path = PathBuf::from(&p);
-        if path.is_file() {
-            if let Ok(meta) = std::fs::metadata(&path) {
-                let filename = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("file.bin")
-                    .to_string();
-                let size_bytes = meta.len();
-                let item = SharedFileForMobile {
-                    id: generate_random_token()[0..10].to_string(),
-                    filename,
-                    path: path.to_string_lossy().to_string(),
-                    size_bytes,
-                    size_formatted: format_size(size_bytes),
-                    added_at: Local::now().format("%H:%M:%S").to_string(),
-                };
-                new_shared.push(item);
-            }
+        collect_files_recursive(&path, &mut all_files);
+    }
+
+    let mut new_shared = Vec::new();
+    for path in all_files {
+        if let Ok(meta) = std::fs::metadata(&path) {
+            let filename = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("file.bin")
+                .to_string();
+            let size_bytes = meta.len();
+            let item = SharedFileForMobile {
+                id: generate_random_token()[0..10].to_string(),
+                filename,
+                path: path.to_string_lossy().to_string(),
+                size_bytes,
+                size_formatted: format_size(size_bytes),
+                added_at: Local::now().format("%H:%M:%S").to_string(),
+            };
+            new_shared.push(item);
         }
     }
 

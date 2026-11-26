@@ -738,6 +738,8 @@ body {
 .share-dropzone.dragover {
   border-color: var(--primary);
   background: var(--primary-glow);
+  transform: scale(1.01);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .empty-share-state {
@@ -748,6 +750,8 @@ body {
   text-align: center;
   height: 100%;
   padding: 0.35rem;
+  cursor: pointer;
+  user-select: none;
 }
 
 .shared-files-list {
